@@ -1,0 +1,263 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ═══════════════════════════════════════════════════════════════════
+   BASE LAYER — Design tokens and CSS custom properties
+═══════════════════════════════════════════════════════════════════ */
+
+@layer base {
+  :root {
+    /* Light theme tokens */
+    --color-bg: #f8fafc;
+    --color-surface: #ffffff;
+    --color-surface-2: #f1f5f9;
+    --color-border: #e2e8f0;
+    --color-text: #0f172a;
+    --color-text-muted: #64748b;
+    --color-text-subtle: #64748b;
+    --color-bg-rgb: 248, 250, 252;
+    --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.08);
+    --shadow-card-hover: 0 4px 14px rgba(15, 23, 42, 0.1);
+    --skeleton-base: rgba(15, 23, 42, 0.05);
+    --skeleton-shine: rgba(15, 23, 42, 0.1);
+    --sidebar-width: 260px;
+    --sidebar-collapsed-width: 64px;
+    /* Makes native controls (date picker, select menus, scrollbars) follow the theme */
+    color-scheme: light;
+  }
+
+  .dark {
+    /* Dark theme tokens — premium slate with depth */
+    --color-bg: #080d14;
+    --color-surface: #0e1521;
+    --color-surface-2: #141c2e;
+    --color-border: rgba(255, 255, 255, 0.07);
+    --color-text: #f1f5f9;
+    --color-text-muted: #94a3b8;
+    --color-text-subtle: #64748b;
+    --color-bg-rgb: 8, 13, 20;
+    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+    --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.4);
+    --skeleton-base: rgba(255, 255, 255, 0.03);
+    --skeleton-shine: rgba(255, 255, 255, 0.08);
+    color-scheme: dark;
+  }
+
+  * {
+    box-sizing: border-box;
+    border-color: var(--color-border);
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    font-family: 'Inter', system-ui, sans-serif;
+    font-feature-settings: 'cv01', 'cv02', 'cv03';
+    line-height: 1.5;
+    transition: background-color 0.2s ease;
+  }
+
+  /* Focus-visible for keyboard navigation */
+  :focus-visible {
+    outline: 2px solid theme('colors.brand.500');
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.3); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.5); }
+
+  /* Reduced motion support */
+  @media (prefers-reduced-motion: reduce) {
+    *, ::before, ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   COMPONENT LAYER — Reusable design patterns
+═══════════════════════════════════════════════════════════════════ */
+
+@layer components {
+  /* ─── Cards ─────────────────────────────────────────────────── */
+  /* Default inner padding; any `p-*` utility on the element still overrides it. */
+  .card {
+    @apply rounded-2xl border bg-[var(--color-surface)] p-5 transition-shadow duration-200;
+    border-color: var(--color-border);
+    box-shadow: var(--shadow-card);
+  }
+
+  .card-hover {
+    @apply card cursor-pointer;
+  }
+
+  .card-hover:hover {
+    box-shadow: var(--shadow-card-hover);
+  }
+
+  .card-glass {
+    @apply rounded-2xl border;
+    background: var(--color-surface);
+    border-color: var(--color-border);
+    box-shadow: var(--shadow-card);
+  }
+
+  /* ─── Buttons ────────────────────────────────────────────────── */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl font-medium text-sm
+           transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2;
+  }
+
+  .btn-primary {
+    @apply btn bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-800 shadow-sm
+           hover:shadow-brand px-4 py-2.5;
+  }
+
+  .btn-secondary {
+    @apply btn border text-[var(--color-text)] hover:bg-[var(--color-surface-2)] px-4 py-2.5;
+    border-color: var(--color-border);
+    background: var(--color-surface);
+  }
+
+  .btn-ghost {
+    @apply btn text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-2)] px-3 py-2;
+  }
+
+  .btn-danger {
+    @apply btn bg-danger/10 text-danger border border-danger/20 hover:bg-danger/20 px-4 py-2.5;
+  }
+
+  .btn-sm { @apply px-3 py-1.5 text-xs; }
+  .btn-lg { @apply px-6 py-3 text-base; }
+  .btn-icon { @apply btn p-2 rounded-xl; }
+
+  /* ─── Inputs ─────────────────────────────────────────────────── */
+  .input {
+    @apply w-full rounded-xl border bg-[var(--color-surface)] px-4 py-2.5 text-sm
+           text-[var(--color-text)] placeholder-[var(--color-text-subtle)]
+           transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-brand-500/40
+           focus:border-brand-500/50;
+    border-color: var(--color-border);
+  }
+
+  .input:focus {
+    border-color: theme('colors.brand.500 / 50%');
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+  }
+
+  .textarea {
+    @apply input resize-none;
+  }
+
+  .label {
+    @apply block text-sm font-medium text-[var(--color-text-muted)] mb-1.5;
+  }
+
+  /* ─── Status badges ──────────────────────────────────────────── */
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+
+  .badge-draft     { @apply badge bg-[var(--color-surface-2)] text-[var(--color-text-muted)]; }
+  .badge-pending   { @apply badge bg-warning/10 text-warning; }
+  .badge-approved  { @apply badge bg-brand-500/10 text-brand-400; }
+  .badge-published { @apply badge bg-success/10 text-success; }
+  .badge-failed    { @apply badge bg-danger/10 text-danger; }
+  .badge-scheduled { @apply badge bg-info/10 text-info; }
+
+  /* ─── Sidebar ────────────────────────────────────────────────── */
+  .sidebar-item {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium
+           text-[var(--color-text-muted)] hover:text-[var(--color-text)]
+           hover:bg-[var(--color-surface-2)] transition-all duration-150 cursor-pointer;
+  }
+
+  .sidebar-item.active {
+    @apply bg-brand-600/10 text-brand-400;
+    box-shadow: inset 0 0 0 1px rgba(124, 58, 237, 0.2);
+  }
+
+  /* ─── Platform tags ──────────────────────────────────────────── */
+  .platform-linkedin { @apply text-[#0a66c2]; }
+  .platform-instagram { @apply text-[#e1306c]; }
+
+  /* ─── Skeleton loading ───────────────────────────────────────── */
+  .skeleton {
+    @apply animate-shimmer rounded-lg bg-gradient-to-r;
+    background-image: linear-gradient(
+      90deg,
+      var(--skeleton-base) 0%,
+      var(--skeleton-shine) 50%,
+      var(--skeleton-base) 100%
+    );
+    background-size: 200% 100%;
+  }
+
+  /* ─── Divider ────────────────────────────────────────────────── */
+  .divider {
+    @apply border-t;
+    border-color: var(--color-border);
+  }
+
+  /* ─── Page header ────────────────────────────────────────────── */
+  .page-title {
+    @apply text-2xl font-bold tracking-tight text-[var(--color-text)];
+  }
+
+  .page-subtitle {
+    @apply text-sm text-[var(--color-text-muted)] mt-1;
+  }
+
+  /* ─── Approval highlight ─────────────────────────────────────── */
+  .approval-required-ring {
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.5), 0 4px 12px rgba(245, 158, 11, 0.1);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   UTILITY LAYER
+═══════════════════════════════════════════════════════════════════ */
+
+@layer utilities {
+  /* Light theme: the light brand/status shades used for dark mode lack contrast on white. */
+  html:not(.dark) .text-brand-300,
+  html:not(.dark) .text-brand-400 { color: theme('colors.brand.700'); }
+  html:not(.dark) .text-success { color: #047857; }
+  html:not(.dark) .text-warning { color: #b45309; }
+  html:not(.dark) .text-info { color: #1d4ed8; }
+  html:not(.dark) .text-danger { color: #b91c1c; }
+  html:not(.dark) .badge-approved { color: theme('colors.brand.700'); }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-brand-400 to-brand-200;
+  }
+
+  .text-gradient-strong {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-brand-300 via-purple-300 to-brand-400;
+  }
+
+  .surface {
+    background: var(--color-surface);
+    border-color: var(--color-border);
+  }
+
+  .surface-2 {
+    background: var(--color-surface-2);
+  }
+}

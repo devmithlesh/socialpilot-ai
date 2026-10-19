@@ -1,0 +1,367 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────
+// AUTH & USERS
+// ─────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String
+  avatarUrl     String?
+  passwordHash  String?
+  role          UserRole  @default(USER)
+  timezone      String    @default("UTC")
+  isEmailVerified Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  lastLoginAt DateTime?
+
+  sessions        Session[]
+  connectedAccounts ConnectedAccount[]
+  posts           Post[]
+  approvals       Approval[]
+  brandSettings   BrandSettings?
+  activityLogs    ActivityLog[]
+  notifications   Notification[]
+  preferences     UserPreferences?
+
+  @@map("users")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@map("sessions")
+}
+
+// ─────────────────────────────────────────
+// CONNECTED SOCIAL ACCOUNTS
+// ─────────────────────────────────────────
+
+model ConnectedAccount {
+  id           String          @id @default(cuid())
+  userId       String
+  platform     SocialPlatform
+  platformUserId String
+  platformUsername String
+  platformDisplayName String
+  platformAvatarUrl String?
+  // Tokens are AES-256 encrypted before storage
+  encryptedAccessToken  String
+  encryptedRefreshToken String?
+  tokenExpiresAt DateTime?
+  scopes       String[]
+  isActive     Boolean         @default(true)
+  metadata     Json?           // Platform-specific extra data
+
+  connectedAt  DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  lastUsedAt   DateTime?
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  posts Post[]
+  publishingAttempts PublishingAttempt[]
+
+  @@unique([userId, platform, platformUserId])
+  @@index([userId])
+  @@map("connected_accounts")
+}
+
+enum SocialPlatform {
+  LINKEDIN
+  INSTAGRAM
+}
+
+// ─────────────────────────────────────────
+// POSTS & CONTENT VERSIONS
+// ─────────────────────────────────────────
+
+model Post {
+  id          String     @id @default(cuid())
+  userId      String
+  platform    SocialPlatform
+  connectedAccountId String?
+  status      PostStatus @default(DRAFT)
+
+  // Scheduling
+  scheduledAt DateTime?
+  timezone    String?
+
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  publishedAt DateTime?
+
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  connectedAccount ConnectedAccount? @relation(fields: [connectedAccountId], references: [id])
+  versions         PostVersion[]
+  approval         Approval?
+  publishingAttempts PublishingAttempt[]
+  generationHistory  GenerationHistory[]
+  activityLogs     ActivityLog[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([scheduledAt])
+  @@map("posts")
+}
+
+enum PostStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  SCHEDULED
+  PUBLISHING
+  PUBLISHED
+  FAILED
+  REJECTED
+  CANCELLED
+}
+
+model PostVersion {
+  id        String @id @default(cuid())
+  postId    String
+  version   Int    // Monotonically increasing version number
+  caption   String @db.Text
+  hashtags  String[]
+  callToAction String?
+  imageUrl  String?
+  imageAltText String?
+  metadata  Json?  // Platform-specific extra fields
+
+  // Fingerprint of this exact content version for approval binding
+  contentHash String
+
+  createdAt DateTime @default(now())
+  isLatest  Boolean  @default(true)
+
+  post     Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  approval Approval? @relation("ApprovedVersion")
+
+  @@unique([postId, version])
+  @@index([postId])
+  @@map("post_versions")
+}
+
+// ─────────────────────────────────────────
+// AI GENERATION HISTORY
+// ─────────────────────────────────────────
+
+model GenerationHistory {
+  id       String @id @default(cuid())
+  postId   String
+  model    String // e.g. "gemini-1.5-flash"
+  prompt   Json   // The structured prompt sent to Gemini
+  response Json   // The structured response from Gemini
+  tokensUsed Int?
+  durationMs Int?
+  wasSuccessful Boolean @default(true)
+  errorMessage  String?
+
+  createdAt DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@map("generation_history")
+}
+
+// ─────────────────────────────────────────
+// APPROVALS
+// ─────────────────────────────────────────
+
+model Approval {
+  id            String   @id @default(cuid())
+  postId        String   @unique
+  userId        String
+  postVersionId String   @unique // Bound to exact version
+
+  // The exact content that was approved — prevents tampering
+  approvedContentHash String
+  approvedCaption   String @db.Text
+  approvedHashtags  String[]
+  approvedCallToAction String?
+  approvedImageUrl  String?
+
+  // Target destination at time of approval
+  platform     SocialPlatform
+  connectedAccountId String
+
+  approvedAt   DateTime @default(now())
+  expiresAt    DateTime // Approvals expire after a configurable window
+
+  // Tracks if approval has been consumed by a publish
+  isConsumed   Boolean  @default(false)
+  consumedAt   DateTime?
+
+  post        Post        @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id])
+  postVersion PostVersion @relation("ApprovedVersion", fields: [postVersionId], references: [id])
+
+  @@index([postId])
+  @@map("approvals")
+}
+
+// ─────────────────────────────────────────
+// PUBLISHING
+// ─────────────────────────────────────────
+
+model PublishingAttempt {
+  id                 String   @id @default(cuid())
+  postId             String
+  connectedAccountId String
+  idempotencyKey     String   @unique // Prevents duplicate publishes
+  status             PublishStatus @default(PENDING)
+  platformPostId     String?  // Returned by the social platform
+  platformUrl        String?
+  errorCode          String?
+  errorMessage       String?
+  requestPayload     Json?
+  responsePayload    Json?
+
+  attemptedAt  DateTime @default(now())
+  completedAt  DateTime?
+
+  post             Post             @relation(fields: [postId], references: [id], onDelete: Cascade)
+  connectedAccount ConnectedAccount @relation(fields: [connectedAccountId], references: [id])
+
+  @@index([postId])
+  @@map("publishing_attempts")
+}
+
+enum PublishStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  DUPLICATE_PREVENTED
+}
+
+// ─────────────────────────────────────────
+// BRAND SETTINGS
+// ─────────────────────────────────────────
+
+model BrandSettings {
+  id          String  @id @default(cuid())
+  userId      String  @unique
+  brandName   String?
+  brandVoice  String? @db.Text
+  targetAudience String? @db.Text
+  tonePreferences String[]
+  keywords    String[]
+  preferredHashtags String[]
+  guidelines  String? @db.Text // Free-form brand guidelines
+  logoUrl     String?
+  primaryColor String?
+  secondaryColor String?
+
+  // When enabled, one AI draft is generated per day into the approval queue.
+  // Drafts are never published without explicit approval.
+  dailyPostEnabled Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("brand_settings")
+}
+
+// ─────────────────────────────────────────
+// USER PREFERENCES
+// ─────────────────────────────────────────
+
+model UserPreferences {
+  id                String  @id @default(cuid())
+  userId            String  @unique
+  theme             String  @default("dark")
+  language          String  @default("en")
+  emailNotifications Boolean @default(true)
+  pushNotifications  Boolean @default(true)
+  approvalReminderHours Int @default(24)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+
+// ─────────────────────────────────────────
+// NOTIFICATIONS & ACTIVITY
+// ─────────────────────────────────────────
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String?
+  data      Json?
+  isRead    Boolean          @default(false)
+  readAt    DateTime?
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+enum NotificationType {
+  POST_PUBLISHED
+  POST_FAILED
+  POST_SCHEDULED
+  APPROVAL_REQUIRED
+  APPROVAL_EXPIRED
+  ACCOUNT_CONNECTED
+  ACCOUNT_DISCONNECTED
+  ACCOUNT_TOKEN_EXPIRED
+  SYSTEM
+}
+
+model ActivityLog {
+  id        String      @id @default(cuid())
+  userId    String
+  postId    String?
+  action    String      // e.g. "post.created", "post.approved", "post.published"
+  actor     String      // userId or "system"
+  metadata  Json?
+  ipAddress String?
+
+  createdAt DateTime @default(now())
+
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post? @relation(fields: [postId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([postId])
+  @@map("activity_logs")
+}
