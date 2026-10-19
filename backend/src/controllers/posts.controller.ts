@@ -67,11 +67,15 @@ export const generateContent = [
     }
 
     const userId = req.user!.userId;
-    const { postId, connectedAccountId, withImage, ...generationParams } = req.body;
+    const { postId, connectedAccountId, withImage, existingImageUrl, ...generationParams } = req.body;
 
     const { content, durationMs } = await geminiService.generateContent(
       generationParams as GenerationRequest
     );
+
+    if (!content.imageUrl && existingImageUrl) {
+      content.imageUrl = existingImageUrl;
+    }
 
     // Optionally create a matching image. A failure here must not lose the generated text.
     let imageWarning: string | undefined;

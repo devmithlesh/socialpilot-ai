@@ -1,10 +1,10 @@
-import { useMemo } from 'react';
-import { useForm } from 'react-hook-form';
+import { useMemo, useRef } from 'react';
+import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { LogOut, Moon, Sun, Save, KeyRound } from 'lucide-react';
+import { LogOut, Moon, Sun, Save, KeyRound, Camera, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { clsx } from 'clsx';
 import { useAppDispatch, useAppSelector } from '../store';
@@ -15,7 +15,7 @@ import {
   useLogoutMutation,
   useUpdateProfileMutation,
 } from '../api/apiSlice';
-import { Avatar, Button, Input, Select } from '../components/ui';
+import { Button, Combobox, Input } from '../components/ui';
 
 type ApiError = { data?: { error?: { message?: string } } };
 const errorMessage = (err: unknown, fallback: string) => (err as ApiError).data?.error?.message ?? fallback;
@@ -47,6 +47,36 @@ function SectionHeader({ title, description }: { title: string; description: str
   );
 }
 
+const AVATAR_SIZE = 256;
+const MAX_AVATAR_FILE_BYTES = 8 * 1024 * 1024;
+
+/** Center-crops to a square and downsizes so the stored avatar stays around 20-40 KB. */
+function resizeToAvatar(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const side = Math.min(img.width, img.height);
+      const canvas = document.createElement('canvas');
+      canvas.width = AVATAR_SIZE;
+      canvas.height = AVATAR_SIZE;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('Canvas is not supported'));
+        return;
+      }
+      ctx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, AVATAR_SIZE, AVATAR_SIZE);
+      resolve(canvas.toDataURL('image/jpeg', 0.85));
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Could not read this image'));
+    };
+    img.src = objectUrl;
+  });
+}
+
 function getTimezones(current: string): { value: string; label: string }[] {
   const supported = (Intl as unknown as { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf?.('timeZone') ?? [];
   const zones = new Set<string>(['UTC', ...supported]);
@@ -64,6 +94,7 @@ export function ProfilePage() {
   const [changePassword, { isLoading: isChangingPassword }] = useChangePasswordMutation();
   const [logout, { isLoading: isLoggingOut }] = useLogoutMutation();
 
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   const timezones = useMemo(() => getTimezones(user?.timezone ?? 'UTC'), [user?.timezone]);
 
   const profileForm = useForm<ProfileForm>({
@@ -98,6 +129,40 @@ export function ProfilePage() {
     }
   });
 
+  const handleAvatarSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-selecting the same file
+    if (!file) return;
+
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+      toast.error('Please choose a PNG, JPG or WebP image');
+      return;
+    }
+    if (file.size > MAX_AVATAR_FILE_BYTES) {
+      toast.error('Image must be smaller than 8 MB');
+      return;
+    }
+
+    try {
+      const avatarUrl = await resizeToAvatar(file);
+      const res = await updateProfile({ avatarUrl }).unwrap();
+      if (res.data) dispatch(updateUser({ ...user, ...res.data }));
+      toast.success('Profile photo updated');
+    } catch (err) {
+      toast.error(errorMessage(err, 'Could not update profile photo'));
+    }
+  };
+
+  const handleAvatarRemove = async () => {
+    try {
+      const res = await updateProfile({ avatarUrl: null }).unwrap();
+      if (res.data) dispatch(updateUser({ ...user, ...res.data }));
+      toast.success('Profile photo removed');
+    } catch (err) {
+      toast.error(errorMessage(err, 'Could not remove profile photo'));
+    }
+  };
+
   const handleLogout = async () => {
     try {
       await logout().unwrap();
@@ -122,14 +187,56 @@ export function ProfilePage() {
 
       {/* Profile */}
       <section className="card">
-        <div className="flex items-center gap-4 mb-6">
-          <Avatar name={user.name} avatarUrl={user.avatarUrl} size="lg" />
+        <div className="flex items-center gap-5 mb-6">
+          <div className="relative flex-shrink-0">
+            {user.avatarUrl ? (
+              <img
+                src={user.avatarUrl}
+                alt={`${user.name}'s profile photo`}
+                className="h-20 w-20 rounded-full object-cover border"
+                style={{ borderColor: 'var(--color-border)' }}
+              />
+            ) : (
+              <div className="h-20 w-20 rounded-full bg-brand-600 text-white text-2xl font-semibold flex items-center justify-center" aria-hidden="true">
+                {user.name.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase()}
+              </div>
+            )}
+          </div>
           <div className="min-w-0">
             <p className="text-base font-semibold text-[var(--color-text)] truncate">{user.name}</p>
             <p className="text-sm text-[var(--color-text-muted)] truncate">{user.email}</p>
             <p className="text-xs text-[var(--color-text-subtle)] mt-0.5">
               Member since {format(new Date(user.createdAt), 'MMMM yyyy')}
             </p>
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="hidden"
+              onChange={handleAvatarSelected}
+            />
+            <div className="flex gap-2 mt-3">
+              <Button
+                size="sm"
+                variant="secondary"
+                loading={isSavingProfile}
+                leftIcon={<Camera size={14} />}
+                onClick={() => avatarInputRef.current?.click()}
+              >
+                {user.avatarUrl ? 'Change photo' : 'Upload photo'}
+              </Button>
+              {user.avatarUrl && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={isSavingProfile}
+                  leftIcon={<Trash2 size={14} />}
+                  onClick={handleAvatarRemove}
+                >
+                  Remove
+                </Button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -145,7 +252,19 @@ export function ProfilePage() {
             <p className="text-xs text-[var(--color-text-subtle)] mt-1.5">Your email is used to sign in and cannot be changed.</p>
           </div>
           <div>
-            <Select label="Timezone" options={timezones} {...profileForm.register('timezone')} />
+            <Controller
+              control={profileForm.control}
+              name="timezone"
+              render={({ field }) => (
+                <Combobox
+                  label="Timezone"
+                  options={timezones}
+                  value={field.value}
+                  onChange={field.onChange}
+                  placeholder="Search city or region, e.g. Kolkata"
+                />
+              )}
+            />
             <p className="text-xs text-[var(--color-text-subtle)] mt-1.5">
               Used for scheduling and the daily automated post.
             </p>

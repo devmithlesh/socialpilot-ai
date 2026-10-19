@@ -30,10 +30,23 @@ function isValidTimezone(value: string): boolean {
   }
 }
 
-export const updateProfileSchema = z.object({
-  name: z.string().trim().min(2).max(100),
-  timezone: z.string().refine(isValidTimezone, 'Invalid timezone'),
-});
+// Avatars are stored as small data URLs (the client resizes them to ~256px). SVG is excluded on purpose.
+const MAX_AVATAR_CHARS = 300_000;
+
+export const updateProfileSchema = z
+  .object({
+    name: z.string().trim().min(2).max(100).optional(),
+    timezone: z.string().refine(isValidTimezone, 'Invalid timezone').optional(),
+    avatarUrl: z
+      .string()
+      .max(MAX_AVATAR_CHARS, 'Image is too large')
+      .regex(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/, 'Unsupported image format')
+      .nullable()
+      .optional(),
+  })
+  .refine((v) => v.name !== undefined || v.timezone !== undefined || v.avatarUrl !== undefined, {
+    message: 'Nothing to update',
+  });
 
 export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1),
@@ -154,7 +167,11 @@ export async function loginUser(
 export async function updateProfile(userId: string, input: UpdateProfileInput) {
   return prisma.user.update({
     where: { id: userId },
-    data: { name: input.name, timezone: input.timezone },
+    data: {
+      ...(input.name !== undefined && { name: input.name }),
+      ...(input.timezone !== undefined && { timezone: input.timezone }),
+      ...(input.avatarUrl !== undefined && { avatarUrl: input.avatarUrl }),
+    },
     select: {
       id: true,
       name: true,

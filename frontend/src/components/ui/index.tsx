@@ -270,6 +270,175 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
 );
 Select.displayName = 'Select';
 
+// ─── Combobox (searchable select) ─────────────────────────────────────────────
+
+interface ComboboxProps {
+  label?: string;
+  options: { value: string; label: string }[];
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  error?: string;
+  id?: string;
+}
+
+/** Searchable single-select. Type to filter, arrow keys to move, Enter to choose, Escape to close. */
+export function Combobox({ label, options, value, onChange, placeholder = 'Search...', error, id }: ComboboxProps) {
+  const reactId = React.useId();
+  const inputId = id ?? `combobox-${reactId}`;
+  const listId = `${inputId}-list`;
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const listRef = React.useRef<HTMLUListElement>(null);
+
+  const [open, setOpen] = React.useState(false);
+  const [query, setQuery] = React.useState('');
+  const [activeIndex, setActiveIndex] = React.useState(0);
+
+  const selected = options.find((o) => o.value === value);
+
+  const filtered = React.useMemo(() => {
+    const q = query.trim().toLowerCase().replace(/\s+/g, '_');
+    if (!q) return options;
+    const plain = query.trim().toLowerCase();
+    return options.filter((o) => o.value.toLowerCase().includes(q) || o.label.toLowerCase().includes(plain));
+  }, [options, query]);
+
+  const close = React.useCallback(() => {
+    setOpen(false);
+    setQuery('');
+  }, []);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const handlePointerDown = (e: MouseEvent) => {
+      if (!containerRef.current?.contains(e.target as Node)) close();
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, [open, close]);
+
+  // Keep the highlighted option visible while navigating with the keyboard
+  React.useEffect(() => {
+    if (!open) return;
+    listRef.current?.children[activeIndex]?.scrollIntoView({ block: 'nearest' });
+  }, [activeIndex, open]);
+
+  const choose = (optionValue: string) => {
+    onChange(optionValue);
+    close();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (!open) {
+        setOpen(true);
+        return;
+      }
+      setActiveIndex((i) => Math.min(i + 1, filtered.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIndex((i) => Math.max(i - 1, 0));
+    } else if (e.key === 'Enter' && open) {
+      e.preventDefault();
+      if (filtered[activeIndex]) choose(filtered[activeIndex].value);
+    } else if (e.key === 'Escape' && open) {
+      e.preventDefault();
+      close();
+    } else if (e.key === 'Tab') {
+      close();
+    }
+  };
+
+  return (
+    <div className="w-full" ref={containerRef}>
+      {label && (
+        <label htmlFor={inputId} className="label">
+          {label}
+        </label>
+      )}
+      <div className="relative">
+        <input
+          id={inputId}
+          type="text"
+          role="combobox"
+          aria-expanded={open}
+          aria-controls={listId}
+          aria-autocomplete="list"
+          aria-activedescendant={open && filtered[activeIndex] ? `${inputId}-opt-${activeIndex}` : undefined}
+          aria-invalid={!!error}
+          autoComplete="off"
+          className={clsx('input pr-9', error && 'border-danger')}
+          placeholder={open ? placeholder : undefined}
+          value={open ? query : (selected?.label ?? '')}
+          onFocus={() => {
+            setOpen(true);
+            setActiveIndex(Math.max(0, options.findIndex((o) => o.value === value)));
+          }}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setActiveIndex(0);
+            setOpen(true);
+          }}
+          onKeyDown={handleKeyDown}
+        />
+        <svg
+          className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--color-text-subtle)]"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          aria-hidden="true"
+        >
+          <path d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" />
+        </svg>
+
+        {open && (
+          <ul
+            ref={listRef}
+            id={listId}
+            role="listbox"
+            className="absolute z-30 mt-1 max-h-60 w-full overflow-y-auto rounded-xl border py-1 text-sm"
+            style={{
+              background: 'var(--color-surface)',
+              borderColor: 'var(--color-border)',
+              boxShadow: 'var(--shadow-card-hover)',
+            }}
+          >
+            {filtered.length === 0 ? (
+              <li className="px-3 py-2 text-[var(--color-text-muted)]">No matches</li>
+            ) : (
+              filtered.map((option, index) => (
+                <li
+                  key={option.value}
+                  id={`${inputId}-opt-${index}`}
+                  role="option"
+                  aria-selected={option.value === value}
+                  onMouseDown={(e) => {
+                    e.preventDefault(); // keep input focus so the blur/outside handler does not fire first
+                    choose(option.value);
+                  }}
+                  onMouseEnter={() => setActiveIndex(index)}
+                  className={clsx(
+                    'cursor-pointer px-3 py-2 text-[var(--color-text)]',
+                    index === activeIndex && 'bg-[var(--color-surface-2)]',
+                    option.value === value && 'font-semibold text-brand-400',
+                  )}
+                >
+                  {option.label}
+                </li>
+              ))
+            )}
+          </ul>
+        )}
+      </div>
+      {error && (
+        <p className="mt-1.5 text-xs text-danger" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ─── Modal ────────────────────────────────────────────────────────────────────
 
 interface ModalProps {

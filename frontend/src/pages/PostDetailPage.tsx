@@ -4,7 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   CheckCircle2, Edit3, Send, AlertTriangle, ArrowLeft,
   Clock, Hash, Megaphone, Shield, Info,
-  Image as ImageIcon, UploadCloud, Check,
+  Image as ImageIcon, UploadCloud, Check, Sparkles,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { clsx } from 'clsx';
@@ -14,6 +14,7 @@ import {
   usePublishPostMutation,
   useSchedulePostMutation,
   useUpdatePostMutation,
+  useGenerateImageMutation,
   useGetAccountsQuery,
 } from '../api/apiSlice';
 import { Button, Modal, PlatformIcon, StatusBadge, Spinner } from '../components/ui';
@@ -42,6 +43,7 @@ export function PostDetailPage() {
   const [publish, { isLoading: isPublishing }] = usePublishPostMutation();
   const [schedulePost, { isLoading: isScheduling }] = useSchedulePostMutation();
   const [updatePost, { isLoading: isUpdating }] = useUpdatePostMutation();
+  const [generateImage, { isLoading: isGeneratingImage }] = useGenerateImageMutation();
 
   const post = data?.data;
   const latestVersion = post?.versions?.[0];
@@ -141,6 +143,23 @@ export function PostDetailPage() {
     } catch (err: unknown) {
       const error = err as { data?: { error?: { message?: string } } };
       toast.error(error.data?.error?.message ?? 'Failed to update post');
+    }
+  };
+
+  const handleGenerateImage = async () => {
+    if (!post || !editCaption.trim()) {
+      toast.error('Write the caption first — the image is generated from it.');
+      return;
+    }
+    try {
+      const res = await generateImage({ caption: editCaption, platform: post.platform }).unwrap();
+      if (res.data) {
+        setEditImageUrl(res.data.imageUrl);
+        toast.success('Image generated. Save changes to keep it.');
+      }
+    } catch (err: unknown) {
+      const error = err as { data?: { error?: { message?: string } } };
+      toast.error(error.data?.error?.message ?? 'Image generation failed. Please try again.');
     }
   };
 
@@ -565,7 +584,17 @@ export function PostDetailPage() {
               onChange={handleImageFileChange}
             />
 
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="primary"
+                size="sm"
+                className="flex-1 text-xs"
+                loading={isGeneratingImage}
+                onClick={handleGenerateImage}
+                leftIcon={<Sparkles size={14} />}
+              >
+                {editImageUrl ? 'Regenerate with AI' : 'Generate image with AI'}
+              </Button>
               <Button
                 variant="secondary"
                 size="sm"
@@ -573,7 +602,7 @@ export function PostDetailPage() {
                 onClick={() => fileInputRef.current?.click()}
                 leftIcon={<UploadCloud size={14} />}
               >
-                Upload New Image from Device
+                Upload from device
               </Button>
               {editImageUrl && (
                 <Button

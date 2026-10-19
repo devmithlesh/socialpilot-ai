@@ -80,6 +80,7 @@ export function AIStudioPage() {
     size: number;
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [withImage, setWithImage] = useState(true);
 
   const [generate, { isLoading }] = useGenerateContentMutation();
 
@@ -132,6 +133,7 @@ export function AIStudioPage() {
         topic: values.topic?.trim() || 'Uploaded visual breakdown and insights',
         imageBase64: uploadedImage?.base64,
         imageMimeType: uploadedImage?.mimeType,
+        withImage: withImage && !uploadedImage,
         operation: 'generate',
       }).unwrap();
 
@@ -143,6 +145,9 @@ export function AIStudioPage() {
         setEditedCta(result.data.content.callToAction || '');
         setIsEditing(false);
         toast.success(uploadedImage ? 'Post generated from your uploaded image!' : 'Content generated and saved as draft');
+        if (result.data.imageWarning) {
+          toast.error('Post text is ready, but the image could not be generated. You can retry from the post editor.');
+        }
       }
     } catch (err: unknown) {
       const error = err as { data?: { error?: { message?: string } } };
@@ -161,6 +166,8 @@ export function AIStudioPage() {
         postId: savedPostId ?? undefined,
         imageBase64: uploadedImage?.base64,
         imageMimeType: uploadedImage?.mimeType,
+        // Keep the AI-generated image when only the text is being reworked
+        existingImageUrl: !uploadedImage ? generatedContent?.imageUrl ?? undefined : undefined,
       }).unwrap();
 
       if (result.success && result.data) {
@@ -430,6 +437,23 @@ export function AIStudioPage() {
               )}
             </AnimatePresence>
 
+            {!uploadedImage && (
+              <label className="flex items-start gap-3 rounded-xl border p-3 cursor-pointer hover:bg-[var(--color-surface-2)] transition-colors" style={{ borderColor: 'var(--color-border)' }}>
+                <input
+                  type="checkbox"
+                  checked={withImage}
+                  onChange={(e) => setWithImage(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 accent-[var(--color-brand,#7c3aed)]"
+                />
+                <span>
+                  <span className="block text-sm font-medium text-[var(--color-text)]">Also generate a matching image</span>
+                  <span className="block text-xs text-[var(--color-text-muted)] mt-0.5">
+                    AI creates an image related to the post. Takes a few extra seconds; you can replace it in the editor.
+                  </span>
+                </span>
+              </label>
+            )}
+
             <Button
               type="submit"
               variant="primary"
@@ -437,7 +461,7 @@ export function AIStudioPage() {
               loading={isLoading}
               leftIcon={<Sparkles size={16} />}
             >
-              {isLoading ? 'Generating...' : 'Generate Content'}
+              {isLoading ? (withImage && !uploadedImage ? 'Generating text & image...' : 'Generating...') : 'Generate Content'}
             </Button>
           </form>
         </motion.div>
@@ -510,7 +534,7 @@ export function AIStudioPage() {
                       <div className="flex items-center justify-between">
                         <p className="label flex items-center gap-1.5 text-brand-400 font-semibold text-xs tracking-wide uppercase">
                           <ImageIcon size={15} />
-                          Your Uploaded Gallery Visual (Analyzed by Gemini)
+                          {uploadedImage ? 'Your Uploaded Image' : 'AI-Generated Image'}
                         </p>
                         <span className="text-xs text-brand-400 bg-brand-500/10 px-2.5 py-0.5 rounded-lg border border-brand-500/20 font-medium">
                           Active Visual
@@ -524,7 +548,7 @@ export function AIStudioPage() {
                         />
                         {generatedContent.imageAltText && (
                           <div className="p-3 bg-[var(--color-surface-2)] border-t border-[var(--color-border)] text-xs text-[var(--color-text-muted)]">
-                            💡 <span className="font-semibold text-[var(--color-text)]">Gemini Visual Analysis:</span> {generatedContent.imageAltText}
+                            💡 <span className="font-semibold text-[var(--color-text)]">Image description:</span> {generatedContent.imageAltText}
                           </div>
                         )}
                       </div>

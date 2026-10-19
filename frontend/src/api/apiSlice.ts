@@ -63,7 +63,7 @@ export const api = createApi({
       providesTags: ['User'],
     }),
 
-    updateProfile: builder.mutation<ApiResponse<User>, { name: string; timezone: string }>({
+    updateProfile: builder.mutation<ApiResponse<User>, { name?: string; timezone?: string; avatarUrl?: string | null }>({
       query: (body) => ({ url: '/auth/profile', method: 'PATCH', body }),
       invalidatesTags: ['User'],
     }),
