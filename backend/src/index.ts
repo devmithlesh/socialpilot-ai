@@ -11,7 +11,7 @@ async function main() {
     logger.info('Database connected successfully');
   } catch (err) {
     const error = err as Error & { code?: string };
-    // Never log DATABASE_URL itself — only the safe, host-level reason.
+    // Never log DATABASE_URL or credentials that might appear in a driver error.
     const host = (() => {
       try {
         return new URL(config.DATABASE_URL).host;
@@ -19,7 +19,10 @@ async function main() {
         return 'unparseable';
       }
     })();
-    logger.error('Failed to connect to database', {
+    const reason = error.message
+      .replaceAll(config.DATABASE_URL, '[DATABASE_URL]')
+      .replace(/(postgres(?:ql)?:\/\/)[^@\s]+@/gi, '$1[redacted]@');
+    logger.error(`Failed to connect to database: ${reason} (host: ${host})`, {
       error: error.message,
       code: error.code,
       host,
