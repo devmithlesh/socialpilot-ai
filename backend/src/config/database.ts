@@ -9,7 +9,7 @@ const globalForPrisma = globalThis as unknown as {
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
-    log: config.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+    log: ['error'],
     // The default 5s interactive-transaction timeout is too tight for a remote
     // (pooled) database; approval and versioning logic need several round trips.
     transactionOptions: { maxWait: 10_000, timeout: 30_000 },

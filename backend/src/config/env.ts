@@ -42,7 +42,45 @@ const envSchema = z.object({
   MAX_UPLOAD_SIZE_MB: z.coerce.number().positive().default(10),
 });
 
+/**
+ * Hosting dashboards (Railway "Raw Editor", etc.) often keep the quotes from a pasted `KEY="value"` line,
+ * which breaks URLs such as DATABASE_URL. Strip one pair of wrapping quotes and surrounding whitespace.
+ * Done on process.env itself because Prisma reads DATABASE_URL directly from it.
+ */
+function normalizeProcessEnv(): void {
+  for (const [key, value] of Object.entries(process.env)) {
+    if (typeof value !== 'string') continue;
+    const trimmed = value.trim();
+    const unquoted = /^(["'])(.*)\1$/.test(trimmed) ? trimmed.slice(1, -1).trim() : trimmed;
+    if (unquoted !== value) process.env[key] = unquoted;
+  }
+
+  const databaseUrl = process.env.DATABASE_URL;
+  if (databaseUrl) {
+    process.env.DATABASE_URL = normalizeDatabaseUrl(databaseUrl);
+  }
+}
+
+/**
+ * Railway / Prisma + Supabase pooler needs `sslmode=require` and `pgbouncer=true`.
+ * The URL itself is never logged — only whether those params were added.
+ */
+function normalizeDatabaseUrl(raw: string): string {
+  try {
+    const parsed = new URL(raw);
+    if (!parsed.searchParams.has('sslmode')) parsed.searchParams.set('sslmode', 'require');
+    if (parsed.hostname.includes('pooler.supabase.com') && !parsed.searchParams.has('pgbouncer')) {
+      parsed.searchParams.set('pgbouncer', 'true');
+    }
+    return parsed.toString();
+  } catch {
+    return raw;
+  }
+}
+
 function loadConfig() {
+  normalizeProcessEnv();
+
   // Treat empty strings (e.g. `LINKEDIN_CLIENT_ID=`) as "not set"
   const raw = Object.fromEntries(
     Object.entries(process.env).filter(([, value]) => value !== undefined && value !== '')

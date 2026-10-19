@@ -10,7 +10,20 @@ async function main() {
     await prisma.$connect();
     logger.info('Database connected successfully');
   } catch (err) {
-    logger.error('Failed to connect to database', { error: (err as Error).message });
+    const error = err as Error & { code?: string };
+    // Never log DATABASE_URL itself — only the safe, host-level reason.
+    const host = (() => {
+      try {
+        return new URL(config.DATABASE_URL).host;
+      } catch {
+        return 'unparseable';
+      }
+    })();
+    logger.error('Failed to connect to database', {
+      error: error.message,
+      code: error.code,
+      host,
+    });
     process.exit(1);
   }
 

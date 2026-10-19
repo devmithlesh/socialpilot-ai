@@ -13,6 +13,11 @@ import routes from './routes';
 export function createApp() {
   const app = express();
 
+  // Behind a hosting proxy (Render/Railway/...) req.ip and rate limiting need the forwarded client IP
+  if (config.NODE_ENV === 'production') {
+    app.set('trust proxy', 1);
+  }
+
   // ─── Security headers ────────────────────────────────────────────────────────
   app.use(helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' },
