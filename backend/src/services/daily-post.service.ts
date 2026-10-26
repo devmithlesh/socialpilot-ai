@@ -67,16 +67,9 @@ export async function generateDailyDraft(
   const { content, durationMs, model } = await openaiService.generateContent({
     platform: 'LINKEDIN',
     operation: 'generate',
-    topic: `Choose ONE fresh, specific, useful topic related to: ${focus}`,
-    instructions: recentOpeners.length
-      ? `Do not repeat or closely resemble these recent posts:\n${recentOpeners.join('\n')}`
-      : undefined,
-    brandVoice: brand?.brandVoice ?? undefined,
-    targetAudience: brand?.targetAudience ?? undefined,
-    brandGuidelines: brand?.guidelines ?? undefined,
-    tone: brand?.tonePreferences[0],
-    keywords: brand?.keywords,
-    contentLength: 'short',
+    topic: recentOpeners.length
+      ? `Choose ONE fresh, specific, useful topic related to: ${focus}. Do not repeat these recent posts:\n${recentOpeners.join('\n')}`
+      : `Choose ONE fresh, specific, useful topic related to: ${focus}`,
   });
 
   const post = await createPost(

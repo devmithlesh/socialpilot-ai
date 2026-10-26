@@ -1,58 +1,25 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
   Sparkles, RefreshCw, Wand2, Minimize2, Maximize2, Hash,
-  Megaphone, ChevronDown, ChevronUp, CheckCircle2,
-  Copy, ArrowRight, Zap, Image as ImageIcon,
-  UploadCloud, X,
+  Megaphone, CheckCircle2, Copy, ArrowRight, Zap, Image as ImageIcon,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useGenerateContentMutation } from '../api/apiSlice';
-import { Button, Textarea, Input, Select, PlatformIcon } from '../components/ui';
+import { Button, Textarea, PlatformIcon } from '../components/ui';
 import type { GeneratedContent, SocialPlatform } from '../types';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 
 const formSchema = z.object({
-  topic: z.string().optional(),
-  instructions: z.string().optional(),
+  topic: z.string().trim().min(1, 'Enter a topic'),
   platform: z.enum(['LINKEDIN', 'INSTAGRAM']),
-  targetAudience: z.string().optional(),
-  tone: z.string().optional(),
-  objective: z.string().optional(),
-  contentLength: z.enum(['short', 'medium', 'long']).optional(),
-  language: z.string().optional(),
-  hashtagPreferences: z.string().optional(),
-  ctaPreferences: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
-
-const TONE_OPTIONS = [
-  { value: '', label: 'Select tone...' },
-  { value: 'professional', label: 'Professional' },
-  { value: 'conversational', label: 'Conversational' },
-  { value: 'inspirational', label: 'Inspirational' },
-  { value: 'educational', label: 'Educational' },
-  { value: 'humorous', label: 'Humorous' },
-  { value: 'authoritative', label: 'Authoritative' },
-  { value: 'empathetic', label: 'Empathetic' },
-  { value: 'casual', label: 'Casual' },
-];
-
-const OBJECTIVE_OPTIONS = [
-  { value: '', label: 'Select objective...' },
-  { value: 'brand_awareness', label: 'Brand Awareness' },
-  { value: 'lead_generation', label: 'Lead Generation' },
-  { value: 'engagement', label: 'Drive Engagement' },
-  { value: 'education', label: 'Educate Audience' },
-  { value: 'thought_leadership', label: 'Thought Leadership' },
-  { value: 'product_launch', label: 'Product Launch' },
-  { value: 'event_promotion', label: 'Event Promotion' },
-];
 
 const OPERATIONS = [
   { id: 'regenerate', label: 'Regenerate', icon: RefreshCw },
@@ -66,20 +33,12 @@ const OPERATIONS = [
 
 export function AIStudioPage() {
   const navigate = useNavigate();
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null);
   const [savedPostId, setSavedPostId] = useState<string | null>(null);
   const [editedCaption, setEditedCaption] = useState('');
   const [editedHashtags, setEditedHashtags] = useState<string[]>([]);
   const [editedCta, setEditedCta] = useState('');
   const [isEditing, setIsEditing] = useState(false);
-  const [uploadedImage, setUploadedImage] = useState<{
-    base64: string;
-    mimeType: string;
-    name: string;
-    size: number;
-  } | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [withImage, setWithImage] = useState(true);
 
   const [generate, { isLoading }] = useGenerateContentMutation();
@@ -88,52 +47,20 @@ export function AIStudioPage() {
     register,
     handleSubmit,
     watch,
-    setValue,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: { platform: 'LINKEDIN', contentLength: 'short' },
+    defaultValues: { platform: 'LINKEDIN' },
   });
 
   const platform = watch('platform') as SocialPlatform;
 
-  const handleImageSelect = (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please upload an image file (PNG, JPG, WEBP)');
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error('Image must be less than 10MB');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base64 = reader.result as string;
-      setUploadedImage({
-        base64,
-        mimeType: file.type,
-        name: file.name,
-        size: file.size,
-      });
-      toast.success(`Image "${file.name}" uploaded! ChatGPT will analyze it.`);
-    };
-    reader.readAsDataURL(file);
-  };
-
   const onGenerate = handleSubmit(async (values) => {
-    if (!values.topic?.trim() && !uploadedImage) {
-      toast.error('Please enter a topic or upload an image from your gallery.');
-      return;
-    }
-
     try {
       const result = await generate({
-        ...values,
-        topic: values.topic?.trim() || 'Uploaded visual breakdown and insights',
-        imageBase64: uploadedImage?.base64,
-        imageMimeType: uploadedImage?.mimeType,
-        withImage: withImage && !uploadedImage,
+        topic: values.topic.trim(),
+        platform: values.platform,
+        withImage,
         operation: 'generate',
       }).unwrap();
 
@@ -144,7 +71,7 @@ export function AIStudioPage() {
         setEditedHashtags(result.data.content.hashtags || []);
         setEditedCta(result.data.content.callToAction || '');
         setIsEditing(false);
-        toast.success(uploadedImage ? 'Post generated from your uploaded image!' : 'Content generated and saved as draft');
+        toast.success('Content generated and saved as draft');
         if (result.data.imageWarning) {
           toast.error('Post text is ready, but the image could not be generated. You can retry from the post editor.');
         }
@@ -159,15 +86,12 @@ export function AIStudioPage() {
     const values = watch();
     try {
       const result = await generate({
-        ...values,
-        topic: values.topic?.trim() || 'Uploaded visual breakdown and insights',
-        operation: operation as FormValues['platform'],
+        topic: values.topic.trim(),
+        platform: values.platform,
+        operation: operation as 'generate',
         existingContent: editedCaption || generatedContent?.caption,
         postId: savedPostId ?? undefined,
-        imageBase64: uploadedImage?.base64,
-        imageMimeType: uploadedImage?.mimeType,
-        // Keep the AI-generated image when only the text is being reworked
-        existingImageUrl: !uploadedImage ? generatedContent?.imageUrl ?? undefined : undefined,
+        existingImageUrl: generatedContent?.imageUrl ?? undefined,
       }).unwrap();
 
       if (result.success && result.data) {
@@ -247,208 +171,28 @@ export function AIStudioPage() {
               </div>
             </div>
 
-            {/* Gallery Image Uploader */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="label flex items-center gap-1.5 text-xs font-semibold text-[var(--color-text)]">
-                  <UploadCloud size={14} className="text-brand-400" />
-                  Upload Image from Gallery / Device
-                </label>
-                <span className="text-[11px] text-[var(--color-text-muted)]">Optional</span>
-              </div>
-
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleImageSelect(file);
-                }}
-              />
-
-              {!uploadedImage ? (
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    const file = e.dataTransfer.files?.[0];
-                    if (file) handleImageSelect(file);
-                  }}
-                  className="border-2 border-dashed border-[var(--color-border)] hover:border-brand-500/50 rounded-xl p-3.5 flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-all hover:bg-[var(--color-surface-hover)] bg-[var(--color-surface-2)]/40 group"
-                >
-                  <div className="h-9 w-9 rounded-xl bg-brand-500/10 flex items-center justify-center text-brand-400 group-hover:scale-105 transition-transform">
-                    <ImageIcon size={18} />
-                  </div>
-                  <div className="text-center">
-                    <p className="text-xs font-semibold text-[var(--color-text)]">
-                      Select or drop image from gallery
-                    </p>
-                    <p className="text-[11px] text-[var(--color-text-muted)]">
-                      ChatGPT will analyze it and write a matching description
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="relative rounded-xl border border-brand-500/30 bg-brand-500/5 p-3 flex items-center gap-3">
-                  <img
-                    src={uploadedImage.base64}
-                    alt="Uploaded thumbnail"
-                    className="h-14 w-14 object-cover rounded-lg border border-[var(--color-border)] shadow-sm shrink-0"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-brand-400">
-                      <Sparkles size={13} />
-                      <span>ChatGPT ready</span>
-                    </div>
-                    <p className="text-xs font-medium text-[var(--color-text)] truncate mt-0.5">
-                      {uploadedImage.name}
-                    </p>
-                    <p className="text-[10px] text-[var(--color-text-muted)]">
-                      {(uploadedImage.size / 1024).toFixed(0)} KB • AI will write post based on this image
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setUploadedImage(null);
-                      if (fileInputRef.current) fileInputRef.current.value = '';
-                    }}
-                    className="p-1.5 rounded-lg text-[var(--color-text-muted)] hover:text-danger hover:bg-rose-500/10 transition-colors"
-                    title="Remove image"
-                  >
-                    <X size={15} />
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div>
-              <Textarea
-                label={uploadedImage ? "Topic or key angle (Optional)" : "Topic or search prompt *"}
-                placeholder={uploadedImage ? "e.g. 'Focus on step 3' or leave blank for full auto analysis" : "Ask or search anything: e.g. 'Frontend Developer Roadmap', 'B2B SaaS Growth Playbook', 'Fitness in 90 Days', 'Crypto Investing for Beginners'..."}
-                rows={3}
-                error={errors.topic?.message}
-                {...register('topic')}
-              />
-              {!uploadedImage && (
-                <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                  <span className="text-[10px] text-[var(--color-text-muted)] font-medium">Any topic works:</span>
-                  {[
-                    'Frontend Developer Roadmap',
-                    'B2B SaaS Growth Playbook',
-                    'Fitness & Fat Loss in 90 Days',
-                    'Personal Finance Mastery',
-                    'AI Prompt Engineering Guide',
-                  ].map((example) => (
-                    <button
-                      key={example}
-                      type="button"
-                      onClick={() => setValue('topic', example)}
-                      className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--color-surface-2)] hover:bg-brand-500/15 hover:text-brand-400 border border-[var(--color-border)] transition-colors"
-                    >
-                      {example}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
             <Textarea
-              label="Specific instructions"
-              placeholder="Any specific angles, key points, or style guidance..."
-              rows={2}
-              {...register('instructions')}
+              label="Topic *"
+              placeholder="e.g. Frontend Developer Roadmap"
+              rows={3}
+              error={errors.topic?.message}
+              {...register('topic')}
             />
 
-            <div className="grid grid-cols-2 gap-3">
-              <Select
-                label="Tone"
-                options={TONE_OPTIONS}
-                {...register('tone')}
+            <label className="flex items-start gap-3 rounded-xl border p-3 cursor-pointer hover:bg-[var(--color-surface-2)] transition-colors" style={{ borderColor: 'var(--color-border)' }}>
+              <input
+                type="checkbox"
+                checked={withImage}
+                onChange={(e) => setWithImage(e.target.checked)}
+                className="mt-0.5 h-4 w-4 accent-[var(--color-brand,#7c3aed)]"
               />
-              <Select
-                label="Objective"
-                options={OBJECTIVE_OPTIONS}
-                {...register('objective')}
-              />
-            </div>
-
-            <Input
-              label="Target audience"
-              placeholder="e.g. 'SaaS founders, 5-50 employees'"
-              {...register('targetAudience')}
-            />
-
-            {/* Advanced options */}
-            <button
-              type="button"
-              onClick={() => setShowAdvanced(!showAdvanced)}
-              className="flex items-center gap-2 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors"
-            >
-              {showAdvanced ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-              Advanced options
-            </button>
-
-            <AnimatePresence>
-              {showAdvanced && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="space-y-3 overflow-hidden"
-                >
-                  <div className="grid grid-cols-2 gap-3">
-                    <Select
-                      label="Caption length"
-                      options={[{ value: 'short', label: '2 lines' }]}
-                      {...register('contentLength')}
-                    />
-                    <Select
-                      label="Language"
-                      options={[
-                        { value: 'en', label: 'English' },
-                        { value: 'es', label: 'Spanish' },
-                        { value: 'fr', label: 'French' },
-                        { value: 'de', label: 'German' },
-                        { value: 'pt', label: 'Portuguese' },
-                        { value: 'hi', label: 'Hindi' },
-                      ]}
-                      {...register('language')}
-                    />
-                  </div>
-                  <Input
-                    label="Hashtag preferences"
-                    placeholder="e.g. 'mix of niche and popular, no generic ones'"
-                    {...register('hashtagPreferences')}
-                  />
-                  <Input
-                    label="Call-to-action preferences"
-                    placeholder="e.g. 'drive LinkedIn page follows'"
-                    {...register('ctaPreferences')}
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {!uploadedImage && (
-              <label className="flex items-start gap-3 rounded-xl border p-3 cursor-pointer hover:bg-[var(--color-surface-2)] transition-colors" style={{ borderColor: 'var(--color-border)' }}>
-                <input
-                  type="checkbox"
-                  checked={withImage}
-                  onChange={(e) => setWithImage(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 accent-[var(--color-brand,#7c3aed)]"
-                />
-                <span>
-                  <span className="block text-sm font-medium text-[var(--color-text)]">Also generate a matching image</span>
-                  <span className="block text-xs text-[var(--color-text-muted)] mt-0.5">
-                    AI creates an image related to the post. Takes a few extra seconds; you can replace it in the editor.
-                  </span>
+              <span>
+                <span className="block text-sm font-medium text-[var(--color-text)]">Also generate a matching image</span>
+                <span className="block text-xs text-[var(--color-text-muted)] mt-0.5">
+                  AI creates an image related to the post. Takes a few extra seconds; you can replace it in the editor.
                 </span>
-              </label>
-            )}
+              </span>
+            </label>
 
             <Button
               type="submit"
@@ -457,7 +201,7 @@ export function AIStudioPage() {
               loading={isLoading}
               leftIcon={<Sparkles size={16} />}
             >
-              {isLoading ? (withImage && !uploadedImage ? 'Generating text & image...' : 'Generating...') : 'Generate Content'}
+              {isLoading ? (withImage ? 'Generating text & image...' : 'Generating...') : 'Generate Content'}
             </Button>
           </form>
         </motion.div>
@@ -525,12 +269,12 @@ export function AIStudioPage() {
                   className="space-y-4"
                 >
                   {/* 1. Visual Section */}
-                  {uploadedImage || (generatedContent.imageUrl && generatedContent.imageUrl.startsWith('data:image/')) ? (
+                  {generatedContent.imageUrl && generatedContent.imageUrl.startsWith('data:image/') ? (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <p className="label flex items-center gap-1.5 text-brand-400 font-semibold text-xs tracking-wide uppercase">
                           <ImageIcon size={15} />
-                          {uploadedImage ? 'Your Uploaded Image' : 'AI-Generated Image'}
+                          AI-Generated Image
                         </p>
                         <span className="text-xs text-brand-400 bg-brand-500/10 px-2.5 py-0.5 rounded-lg border border-brand-500/20 font-medium">
                           Active Visual
@@ -538,8 +282,8 @@ export function AIStudioPage() {
                       </div>
                       <div className="relative rounded-xl overflow-hidden border border-[var(--color-border)] bg-[var(--color-surface-2)] shadow-xl group">
                         <img
-                          src={uploadedImage?.base64 || generatedContent.imageUrl!}
-                          alt={generatedContent.imageAltText || 'User uploaded visual'}
+                          src={generatedContent.imageUrl}
+                          alt={generatedContent.imageAltText || 'AI-generated visual'}
                           className="w-full max-h-[460px] object-contain rounded-xl bg-[var(--color-surface-2)]"
                         />
                         {generatedContent.imageAltText && (

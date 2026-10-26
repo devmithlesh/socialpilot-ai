@@ -23,33 +23,15 @@ export type GenerationOperation =
   | 'improve'
   | 'shorten'
   | 'lengthen'
-  | 'change_tone'
   | 'improve_hook'
-  | 'generate_hooks'
   | 'generate_hashtags'
-  | 'improve_cta'
-  | 'rewrite_linkedin'
-  | 'rewrite_instagram'
-  | 'generate_variations';
+  | 'improve_cta';
 
 export interface GenerationRequest {
   topic: string;
-  instructions?: string;
   platform: 'LINKEDIN' | 'INSTAGRAM';
-  targetAudience?: string;
-  brandVoice?: string;
-  tone?: string;
-  objective?: string;
-  language?: string;
-  keywords?: string[];
-  hashtagPreferences?: string;
-  ctaPreferences?: string;
-  contentLength?: 'short' | 'medium' | 'long';
-  brandGuidelines?: string;
   existingContent?: string;
   operation?: GenerationOperation;
-  imageBase64?: string;
-  imageMimeType?: string;
 }
 
 const PLATFORM_CONSTRAINTS = {
@@ -73,14 +55,9 @@ const OPERATION_INSTRUCTIONS: Record<GenerationOperation, (request: GenerationRe
   improve: () => 'Tighten the two-line caption so it is punchy and clear',
   shorten: () => 'Keep exactly two short lines and make each line even tighter',
   lengthen: () => 'Keep exactly two lines, but make each line a bit richer and more useful',
-  change_tone: (r) => `Rewrite this two-line post with a ${r.tone ?? 'different'} tone`,
   improve_hook: () => 'Rewrite line 1 so it is a stronger hook. Keep the whole caption at two lines.',
-  generate_hooks: () => 'Rewrite the two-line post starting with a stronger opening line',
   generate_hashtags: () => 'Keep the two-line caption and generate fresh, relevant hashtags',
   improve_cta: () => 'Keep the two-line caption and strengthen the separate call-to-action field',
-  rewrite_linkedin: () => 'Rewrite as a two-line LinkedIn post',
-  rewrite_instagram: () => 'Rewrite as a two-line Instagram post',
-  generate_variations: () => 'Write a distinct two-line variation of this post',
 };
 
 const FALLBACK_MODEL = 'gpt-4o-mini';
@@ -129,18 +106,13 @@ export class OpenAIService {
 
     const startMs = Date.now();
     const prompt = this.buildPrompt(request);
-    const userContent = this.buildUserContent(prompt, request);
     const candidateModels = [this.modelName, FALLBACK_MODEL].filter((m, i, arr) => arr.indexOf(m) === i);
     let lastError: Error | null = null;
 
     for (const model of candidateModels) {
       try {
-        const rawText = await this.callModel(model, userContent);
+        const rawText = await this.callModel(model, prompt);
         const content = this.parseResponse(rawText);
-
-        if (request.imageBase64) {
-          content.imageUrl = request.imageBase64;
-        }
 
         const durationMs = Date.now() - startMs;
         logger.info('Content generated', { model, durationMs, platform: request.platform, operation: request.operation });
@@ -253,24 +225,7 @@ export class OpenAIService {
     }
   }
 
-  private buildUserContent(
-    prompt: string,
-    request: GenerationRequest
-  ): string | Array<{ type: string; text?: string; image_url?: { url: string } }> {
-    if (!request.imageBase64) return prompt;
-
-    const image = parseImagePayload(request.imageBase64, request.imageMimeType);
-    const dataUrl = `data:${image.mimeType};base64,${image.data}`;
-    return [
-      { type: 'text', text: prompt },
-      { type: 'image_url', image_url: { url: dataUrl } },
-    ];
-  }
-
-  private async callModel(
-    model: string,
-    userContent: string | Array<{ type: string; text?: string; image_url?: { url: string } }>
-  ): Promise<string> {
+  private async callModel(model: string, prompt: string): Promise<string> {
     if (!this.apiKey) throw new Error('OpenAI client is not initialised');
 
     const response = await fetch(CHAT_URL, {
@@ -290,7 +245,7 @@ export class OpenAIService {
             content:
               'You are an expert social media copywriter. Captions are always exactly two short lines. Respond with a single JSON object only.',
           },
-          { role: 'user', content: userContent },
+          { role: 'user', content: prompt },
         ],
       }),
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
@@ -348,25 +303,8 @@ export class OpenAIService {
 
     const optionalLines = [
       request.topic && `TOPIC/IDEA: ${request.topic}`,
-      request.instructions && `SPECIFIC INSTRUCTIONS: ${request.instructions}`,
-      request.targetAudience && `TARGET AUDIENCE: ${request.targetAudience}`,
-      request.brandVoice && `BRAND VOICE: ${request.brandVoice}`,
-      request.tone && `TONE: ${request.tone}`,
-      request.objective && `CONTENT OBJECTIVE: ${request.objective}`,
-      request.language && `LANGUAGE: ${request.language}`,
-      request.keywords?.length && `KEYWORDS TO INCLUDE: ${request.keywords.join(', ')}`,
-      request.hashtagPreferences && `HASHTAG PREFERENCES: ${request.hashtagPreferences}`,
-      request.ctaPreferences && `CALL-TO-ACTION PREFERENCES: ${request.ctaPreferences}`,
-      `CONTENT LENGTH: exactly 2 lines (ignore any longer length request)`,
-      request.brandGuidelines && `BRAND GUIDELINES: ${request.brandGuidelines}`,
       request.existingContent && `EXISTING CONTENT TO WORK FROM:\n${request.existingContent}`,
     ].filter(Boolean);
-
-    const imageSection = request.imageBase64
-      ? `
-An image is attached. Read its visible text and content, write the post about what it actually shows,
-and set "imageAltText" to an accurate, descriptive summary of the image.`
-      : '';
 
     return `You are an expert social media strategist and copywriter.
 
@@ -378,7 +316,6 @@ Maximum characters: ${platform.maxChars}
 Hashtag limit: ${platform.hashtagLimit}
 
 ${optionalLines.join('\n')}
-${imageSection}
 
 RULES:
 1. Write about the exact topic provided; do not invent statistics or claims.
@@ -421,15 +358,6 @@ export function limitCaptionToTwoLines(caption: string): string {
   if (words.length < 8) return single;
   const splitAt = Math.ceil(words.length / 2);
   return `${words.slice(0, splitAt).join(' ')}\n${words.slice(splitAt).join(' ')}`;
-}
-
-/** Accepts either a raw base64 string or a `data:<mime>;base64,<data>` URL. */
-function parseImagePayload(imageBase64: string, fallbackMimeType?: string): { mimeType: string; data: string } {
-  const match = imageBase64.match(/^data:([^;]+);base64,(.+)$/);
-  if (match) {
-    return { mimeType: match[1], data: match[2] };
-  }
-  return { mimeType: fallbackMimeType || 'image/jpeg', data: imageBase64 };
 }
 
 export const openaiService = new OpenAIService();

@@ -15,31 +15,16 @@ import { schedulePost } from '../services/scheduling.service';
 import { generateDailyDraft } from '../services/daily-post.service';
 
 const generateContentSchema = z.object({
-  postId: z.string().optional(), // If provided, saves to existing post; otherwise creates draft
-  topic: z.string().trim().default(''), // May be empty when the post is driven by an uploaded image or instructions
-  instructions: z.string().optional(),
+  postId: z.string().optional(),
+  topic: z.string().trim().min(1, 'Topic is required'),
   platform: z.enum(['LINKEDIN', 'INSTAGRAM']),
-  targetAudience: z.string().optional(),
-  brandVoice: z.string().optional(),
-  tone: z.string().optional(),
-  objective: z.string().optional(),
-  language: z.string().optional(),
-  keywords: z.array(z.string()).optional(),
-  hashtagPreferences: z.string().optional(),
-  ctaPreferences: z.string().optional(),
-  contentLength: z.enum(['short', 'medium', 'long']).optional(),
-  brandGuidelines: z.string().optional(),
   existingContent: z.string().optional(),
   operation: z.enum([
     'generate', 'regenerate', 'improve', 'shorten', 'lengthen',
-    'change_tone', 'improve_hook', 'generate_hooks', 'generate_hashtags',
-    'improve_cta', 'rewrite_linkedin', 'rewrite_instagram', 'generate_variations',
+    'improve_hook', 'generate_hashtags', 'improve_cta',
   ]).optional(),
   connectedAccountId: z.string().optional(),
-  imageBase64: z.string().optional(),
-  imageMimeType: z.string().optional(),
   withImage: z.boolean().optional(),
-  // Keeps the post's current image when only the text is being regenerated/improved
   existingImageUrl: z.string().startsWith('data:image/').optional(),
 });
 

@@ -110,23 +110,10 @@ export interface GeneratedContent {
 export interface GenerationRequest {
   postId?: string;
   topic: string;
-  instructions?: string;
   platform: SocialPlatform;
-  targetAudience?: string;
-  brandVoice?: string;
-  tone?: string;
-  objective?: string;
-  language?: string;
-  keywords?: string[];
-  hashtagPreferences?: string;
-  ctaPreferences?: string;
-  contentLength?: 'short' | 'medium' | 'long';
-  brandGuidelines?: string;
   existingContent?: string;
   operation?: string;
   connectedAccountId?: string;
-  imageBase64?: string;
-  imageMimeType?: string;
   withImage?: boolean;
   existingImageUrl?: string;
 }
