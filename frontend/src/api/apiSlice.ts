@@ -4,7 +4,7 @@ import type { RootState } from '../store';
 import { clearCredentials } from '../store/slices/authSlice';
 import type {
   ApiResponse, User, Post, ConnectedAccount, DashboardStats,
-  Notification, GeneratedContent, GenerationRequest,
+  Notification, GeneratedContent, GenerationRequest, TelegramStatus,
 } from '../types';
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001/api';
@@ -40,7 +40,7 @@ const baseQueryWithAuthGuard: BaseQueryFn<string | FetchArgs, unknown, FetchBase
 export const api = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithAuthGuard,
-    tagTypes: ['User', 'Posts', 'Post', 'Accounts', 'Dashboard', 'Notifications'],
+    tagTypes: ['User', 'Posts', 'Post', 'Accounts', 'Dashboard', 'Notifications', 'Telegram'],
 
   endpoints: (builder) => ({
 
@@ -172,6 +172,21 @@ export const api = createApi({
       invalidatesTags: ['Accounts', 'Dashboard'],
     }),
 
+    getTelegramStatus: builder.query<ApiResponse<TelegramStatus>, void>({
+      query: () => '/telegram/status',
+      providesTags: ['Telegram'],
+    }),
+
+    connectTelegram: builder.mutation<ApiResponse<{ url: string; botUsername: string }>, void>({
+      query: () => ({ url: '/telegram/connect', method: 'POST' }),
+      invalidatesTags: ['Telegram'],
+    }),
+
+    disconnectTelegram: builder.mutation<ApiResponse<{ message: string }>, void>({
+      query: () => ({ url: '/telegram/connect', method: 'DELETE' }),
+      invalidatesTags: ['Telegram'],
+    }),
+
     // ─── Notifications ────────────────────────────────────────────────────────
     getNotifications: builder.query<ApiResponse<Notification[]>, void>({
       query: () => '/notifications',
@@ -209,6 +224,9 @@ export const {
   useConnectLinkedInMutation,
   useConnectInstagramMutation,
   useDisconnectAccountMutation,
+  useGetTelegramStatusQuery,
+  useConnectTelegramMutation,
+  useDisconnectTelegramMutation,
   useGetNotificationsQuery,
   useMarkNotificationReadMutation,
 } = api;

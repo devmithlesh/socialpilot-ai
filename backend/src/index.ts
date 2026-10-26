@@ -3,6 +3,7 @@ import { config } from './config/env';
 import { logger } from './config/logger';
 import { prisma } from './config/database';
 import { startSchedulers } from './jobs/scheduler';
+import { telegramService } from './integrations/telegram/telegram.service';
 
 async function main() {
   // Verify database connection before accepting traffic
@@ -39,6 +40,14 @@ async function main() {
       aiAvailable: !!config.OPENAI_API_KEY,
       linkedInConfigured: !!(config.LINKEDIN_CLIENT_ID && config.LINKEDIN_CLIENT_SECRET),
       instagramConfigured: !!(config.INSTAGRAM_APP_ID && config.INSTAGRAM_APP_SECRET),
+      telegramConfigured: telegramService.isAvailable,
+    });
+
+    void telegramService.setupWebhook().catch((err) => {
+      logger.warn('Telegram webhook setup failed', { error: (err as Error).message });
+    });
+    void telegramService.startPolling().catch((err) => {
+      logger.warn('Telegram polling failed', { error: (err as Error).message });
     });
   });
 
@@ -48,6 +57,7 @@ async function main() {
   const shutdown = async (signal: string) => {
     logger.info(`Received ${signal}, shutting down gracefully`);
     stopSchedulers();
+    telegramService.stopPolling();
     server.close(async () => {
       await prisma.$disconnect();
       logger.info('Server closed');

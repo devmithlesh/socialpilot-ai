@@ -5,7 +5,7 @@ import { CheckCircle2, Clock, Calendar, ArrowRight, Sparkles } from 'lucide-reac
 import { clsx } from 'clsx';
 import { addDays, eachDayOfInterval, format, startOfDay } from 'date-fns';
 import toast from 'react-hot-toast';
-import { useGetPostsQuery, useGenerateDailyPostMutation } from '../api/apiSlice';
+import { useGetPostsQuery, useGenerateDailyPostMutation, useGetTelegramStatusQuery } from '../api/apiSlice';
 import { Button, EmptyState, PlatformIcon, Skeleton, Textarea } from '../components/ui';
 import { DateRangeCalendar, clampRange, countDays } from '../components/DateRangeCalendar';
 import { PostPreviewCard } from '../components/PostPreviewCard';
@@ -26,6 +26,8 @@ export function ApprovalQueuePage() {
   const { data: approvedData, refetch: refetchApproved } = useGetPostsQuery({ status: 'APPROVED', limit: 50 });
   const { data: scheduledData, refetch: refetchScheduled } = useGetPostsQuery({ status: 'SCHEDULED', limit: 50 });
   const [generateDailyPost, { isLoading: isGeneratingDaily }] = useGenerateDailyPostMutation();
+  const { data: telegramRes } = useGetTelegramStatusQuery();
+  const telegramConnected = Boolean(telegramRes?.data?.connected);
 
   const [topic, setTopic] = useState('');
   const [platforms, setPlatforms] = useState<SocialPlatform[]>(['LINKEDIN']);
@@ -94,7 +96,8 @@ export function ApprovalQueuePage() {
       <div>
         <h1 className="page-title">Approval Queue</h1>
         <p className="page-subtitle">
-          Write a topic, pick the days, then review each card before you approve or schedule it.
+          Write a topic, pick the days, then review each card here
+          {telegramConnected ? ' or in Telegram' : ''}. Approve to publish on LinkedIn.
         </p>
       </div>
 
@@ -105,6 +108,9 @@ export function ApprovalQueuePage() {
         </div>
         <p className="text-xs text-[var(--color-text-muted)]">
           Fill the topic yourself. After that, choose how many days to generate for.
+          {telegramConnected
+            ? ' Connected Telegram chats get the same drafts with Approve and Reject buttons.'
+            : ' Connect Telegram in Profile to review and approve from your phone.'}
         </p>
 
         <div>

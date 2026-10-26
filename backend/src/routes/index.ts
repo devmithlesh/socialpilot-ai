@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authenticate } from '../middleware/auth';
 import * as authController from '../controllers/auth.controller';
 import * as postsController from '../controllers/posts.controller';
+import * as telegramController from '../controllers/telegram.controller';
 
 const router = Router();
 
@@ -200,6 +201,12 @@ router.delete('/accounts/:accountId', authenticate, async (req, res) => {
     sendSuccess(res, { message: 'Account disconnected' });
   })(req, res, () => {});
 });
+
+// Telegram review / approve (Approve publishes to the post's platform, usually LinkedIn)
+router.get('/telegram/status', authenticate, telegramController.getStatus);
+router.post('/telegram/connect', authenticate, telegramController.createConnectLink);
+router.delete('/telegram/connect', authenticate, telegramController.disconnect);
+router.post('/telegram/webhook', telegramController.webhook);
 
 // Notifications
 router.get('/notifications', authenticate, async (req, res) => {

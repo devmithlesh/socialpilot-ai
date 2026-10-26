@@ -24,6 +24,10 @@ model User {
   timezone      String    @default("UTC")
   isEmailVerified Boolean @default(false)
 
+  telegramChatId      String? @unique
+  telegramUsername    String?
+  telegramConnectCode String? @unique
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   lastLoginAt DateTime?

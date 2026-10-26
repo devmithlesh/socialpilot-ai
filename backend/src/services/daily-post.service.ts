@@ -2,6 +2,7 @@ import { prisma } from '../config/database';
 import { logger } from '../config/logger';
 import { openaiService } from '../integrations/openai/openai.service';
 import { createPost } from './post.service';
+import { telegramService } from '../integrations/telegram/telegram.service';
 type PublishPlatform = 'LINKEDIN' | 'INSTAGRAM';
 
 const RECENT_POSTS_TO_AVOID = 10;
@@ -171,6 +172,10 @@ export async function generateDailyDraft(
       postIds.push(post.id);
     }
   }
+
+  await telegramService.notifyDrafts(userId, postIds).catch((err) => {
+    logger.warn('Telegram notify skipped', { error: (err as Error).message });
+  });
 
   return postIds;
 }

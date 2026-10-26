@@ -33,6 +33,11 @@ const envSchema = z.object({
   INSTAGRAM_APP_SECRET: z.string().optional(),
   INSTAGRAM_REDIRECT_URI: z.string().optional(),
 
+  // Telegram Bot API (free). Create a bot with @BotFather and paste the token.
+  TELEGRAM_BOT_TOKEN: z.string().optional(),
+  TELEGRAM_WEBHOOK_URL: z.string().url().optional(),
+  TELEGRAM_WEBHOOK_SECRET: z.string().optional(),
+
   // Business logic
   APPROVAL_EXPIRY_HOURS: z.coerce.number().positive().default(24),
   DAILY_POST_CRON: z.string().default('0 9 * * *'),

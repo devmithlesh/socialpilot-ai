@@ -1,10 +1,10 @@
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { LogOut, Moon, Sun, Save, KeyRound, Camera, Trash2 } from 'lucide-react';
+import { LogOut, Moon, Sun, Save, KeyRound, Camera, Trash2, MessageCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { clsx } from 'clsx';
 import { useAppDispatch, useAppSelector } from '../store';
@@ -12,6 +12,9 @@ import { setTheme } from '../store/slices/uiSlice';
 import { clearCredentials, updateUser } from '../store/slices/authSlice';
 import {
   useChangePasswordMutation,
+  useConnectTelegramMutation,
+  useDisconnectTelegramMutation,
+  useGetTelegramStatusQuery,
   useLogoutMutation,
   useUpdateProfileMutation,
 } from '../api/apiSlice';
@@ -93,6 +96,11 @@ export function ProfilePage() {
   const [updateProfile, { isLoading: isSavingProfile }] = useUpdateProfileMutation();
   const [changePassword, { isLoading: isChangingPassword }] = useChangePasswordMutation();
   const [logout, { isLoading: isLoggingOut }] = useLogoutMutation();
+  const { data: telegramRes, refetch: refetchTelegram } = useGetTelegramStatusQuery();
+  const [connectTelegram, { isLoading: isConnectingTelegram }] = useConnectTelegramMutation();
+  const [disconnectTelegram, { isLoading: isDisconnectingTelegram }] = useDisconnectTelegramMutation();
+  const [awaitingTelegram, setAwaitingTelegram] = useState(false);
+  const telegram = telegramRes?.data;
 
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const timezones = useMemo(() => getTimezones(user?.timezone ?? 'UTC'), [user?.timezone]);
@@ -106,6 +114,16 @@ export function ProfilePage() {
     resolver: zodResolver(passwordSchema),
     defaultValues: { currentPassword: '', newPassword: '', confirmPassword: '' },
   });
+
+  useEffect(() => {
+    if (!awaitingTelegram) return;
+    const id = window.setInterval(() => { void refetchTelegram(); }, 3000);
+    return () => window.clearInterval(id);
+  }, [awaitingTelegram, refetchTelegram]);
+
+  useEffect(() => {
+    if (telegram?.connected) setAwaitingTelegram(false);
+  }, [telegram?.connected]);
 
   if (!user) return null;
 
@@ -160,6 +178,29 @@ export function ProfilePage() {
       toast.success('Profile photo removed');
     } catch (err) {
       toast.error(errorMessage(err, 'Could not remove profile photo'));
+    }
+  };
+
+  const handleConnectTelegram = async () => {
+    try {
+      const res = await connectTelegram().unwrap();
+      if (res.data?.url) {
+        window.open(res.data.url, '_blank', 'noopener');
+        setAwaitingTelegram(true);
+        toast.success('Open Telegram and tap Start');
+      }
+    } catch (err) {
+      toast.error(errorMessage(err, 'Could not start Telegram connect'));
+    }
+  };
+
+  const handleDisconnectTelegram = async () => {
+    try {
+      await disconnectTelegram().unwrap();
+      setAwaitingTelegram(false);
+      toast.success('Telegram disconnected');
+    } catch (err) {
+      toast.error(errorMessage(err, 'Could not disconnect Telegram'));
     }
   };
 
@@ -310,6 +351,59 @@ export function ProfilePage() {
             );
           })}
         </div>
+      </section>
+
+      {/* Telegram review */}
+      <section className="card">
+        <SectionHeader
+          title="Telegram review"
+          description="Get each daily draft in Telegram. Approve publishes it to LinkedIn (or Instagram if that is the draft)."
+        />
+        {telegram?.connected ? (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="h-10 w-10 rounded-xl bg-sky-500/10 text-sky-400 flex items-center justify-center shrink-0">
+                <MessageCircle size={18} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-[var(--color-text)]">
+                  Connected{telegram.telegramUsername ? ` as @${telegram.telegramUsername}` : ''}
+                </p>
+                <p className="text-xs text-[var(--color-text-muted)]">
+                  New drafts from Approval Queue will also arrive in Telegram.
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              loading={isDisconnectingTelegram}
+              onClick={() => void handleDisconnectTelegram()}
+            >
+              Disconnect
+            </Button>
+          </div>
+        ) : (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <p className="text-sm text-[var(--color-text-muted)]">
+              {telegram?.configured
+                ? awaitingTelegram
+                  ? 'Waiting for you to tap Start in Telegram…'
+                  : 'Connect once, then approve drafts from your phone.'
+                : 'Add TELEGRAM_BOT_TOKEN to backend/.env (create a free bot with @BotFather), then restart the backend.'}
+            </p>
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={!telegram?.configured}
+              loading={isConnectingTelegram}
+              leftIcon={<MessageCircle size={15} />}
+              onClick={() => void handleConnectTelegram()}
+            >
+              Connect Telegram
+            </Button>
+          </div>
+        )}
       </section>
 
       {/* Security */}

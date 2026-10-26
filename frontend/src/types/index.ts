@@ -32,6 +32,13 @@ export interface UserPreferences {
   approvalReminderHours: number;
 }
 
+export interface TelegramStatus {
+  configured: boolean;
+  connected: boolean;
+  telegramUsername: string | null;
+  botUsername: string | null;
+}
+
 export interface ConnectedAccount {
   id: string;
   platform: SocialPlatform;

@@ -405,8 +405,8 @@ export const generateDaily = [
         postId: postIds[0] ?? null,
         count: postIds.length,
         message: postIds.length > 1
-          ? `${postIds.length} drafts generated for your date range. Review, approve, then schedule each one.`
-          : 'Draft generated. Review and approve it in the queue below.',
+          ? `${postIds.length} drafts generated. Review them here or in Telegram, then approve to publish.`
+          : 'Draft generated. Review it here or in Telegram, then approve to publish.',
       });
     } catch (err) {
       const error = err as Error & { code?: string };
