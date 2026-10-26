@@ -96,8 +96,8 @@ export function ApprovalQueuePage() {
       <div>
         <h1 className="page-title">Approval Queue</h1>
         <p className="page-subtitle">
-          Write a topic, pick the days, then review each card here
-          {telegramConnected ? ' or in Telegram' : ''}. Approve to publish on LinkedIn.
+          Write a topic, pick the days, then review each card
+          {telegramConnected ? ' here or in Telegram' : ' here'}. Approve to publish on LinkedIn.
         </p>
       </div>
 
