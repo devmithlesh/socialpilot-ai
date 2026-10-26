@@ -4,7 +4,7 @@ import type { RootState } from '../store';
 import { clearCredentials } from '../store/slices/authSlice';
 import type {
   ApiResponse, User, Post, ConnectedAccount, DashboardStats,
-  BrandSettings, Notification, GeneratedContent, GenerationRequest,
+  Notification, GeneratedContent, GenerationRequest,
 } from '../types';
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001/api';
@@ -40,7 +40,7 @@ const baseQueryWithAuthGuard: BaseQueryFn<string | FetchArgs, unknown, FetchBase
 export const api = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithAuthGuard,
-  tagTypes: ['User', 'Posts', 'Post', 'Accounts', 'Dashboard', 'BrandSettings', 'Notifications'],
+    tagTypes: ['User', 'Posts', 'Post', 'Accounts', 'Dashboard', 'Notifications'],
 
   endpoints: (builder) => ({
 
@@ -122,8 +122,11 @@ export const api = createApi({
       invalidatesTags: (_result, _error, { postId }) => [{ type: 'Post', id: postId }, 'Posts', 'Dashboard'],
     }),
 
-    generateDailyPost: builder.mutation<ApiResponse<{ postId: string | null; message: string }>, void>({
-      query: () => ({ url: '/posts/generate-daily', method: 'POST' }),
+    generateDailyPost: builder.mutation<
+      ApiResponse<{ postId: string | null; postIds?: string[]; count?: number; message: string }>,
+      { topic: string; platforms: Array<'LINKEDIN' | 'INSTAGRAM'>; withImage?: boolean; scheduledTimes?: string[] }
+    >({
+      query: (body) => ({ url: '/posts/generate-daily', method: 'POST', body }),
       invalidatesTags: ['Posts', 'Dashboard', 'Notifications'],
     }),
 
@@ -169,17 +172,6 @@ export const api = createApi({
       invalidatesTags: ['Accounts', 'Dashboard'],
     }),
 
-    // ─── Brand Settings ───────────────────────────────────────────────────────
-    getBrandSettings: builder.query<ApiResponse<BrandSettings | null>, void>({
-      query: () => '/brand-settings',
-      providesTags: ['BrandSettings'],
-    }),
-
-    updateBrandSettings: builder.mutation<ApiResponse<BrandSettings>, Partial<BrandSettings>>({
-      query: (body) => ({ url: '/brand-settings', method: 'PUT', body }),
-      invalidatesTags: ['BrandSettings'],
-    }),
-
     // ─── Notifications ────────────────────────────────────────────────────────
     getNotifications: builder.query<ApiResponse<Notification[]>, void>({
       query: () => '/notifications',
@@ -217,8 +209,6 @@ export const {
   useConnectLinkedInMutation,
   useConnectInstagramMutation,
   useDisconnectAccountMutation,
-  useGetBrandSettingsQuery,
-  useUpdateBrandSettingsMutation,
   useGetNotificationsQuery,
   useMarkNotificationReadMutation,
 } = api;

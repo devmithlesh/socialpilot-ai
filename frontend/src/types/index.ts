@@ -111,8 +111,6 @@ export interface GenerationRequest {
   postId?: string;
   topic: string;
   platform: SocialPlatform;
-  existingContent?: string;
-  operation?: string;
   connectedAccountId?: string;
   withImage?: boolean;
   existingImageUrl?: string;
@@ -128,21 +126,6 @@ export interface DashboardStats {
   };
   recentPosts: Post[];
   connectedAccounts: Pick<ConnectedAccount, 'platform' | 'platformUsername' | 'platformDisplayName' | 'platformAvatarUrl'>[];
-}
-
-export interface BrandSettings {
-  id: string;
-  brandName: string | null;
-  brandVoice: string | null;
-  targetAudience: string | null;
-  tonePreferences: string[];
-  keywords: string[];
-  preferredHashtags: string[];
-  guidelines: string | null;
-  logoUrl: string | null;
-  primaryColor: string | null;
-  secondaryColor: string | null;
-  dailyPostEnabled: boolean;
 }
 
 export interface Notification {

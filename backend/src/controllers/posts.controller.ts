@@ -18,11 +18,6 @@ const generateContentSchema = z.object({
   postId: z.string().optional(),
   topic: z.string().trim().min(1, 'Topic is required'),
   platform: z.enum(['LINKEDIN', 'INSTAGRAM']),
-  existingContent: z.string().optional(),
-  operation: z.enum([
-    'generate', 'regenerate', 'improve', 'shorten', 'lengthen',
-    'improve_hook', 'generate_hashtags', 'improve_cta',
-  ]).optional(),
   connectedAccountId: z.string().optional(),
   withImage: z.boolean().optional(),
   existingImageUrl: z.string().startsWith('data:image/').optional(),
@@ -387,17 +382,37 @@ export const schedule = [
 
 // ─── Daily Draft ──────────────────────────────────────────────────────────────
 
-export const generateDaily = asyncHandler(async (req: Request, res: Response) => {
-  try {
-    const postId = await generateDailyDraft(req.user!.userId, { force: true });
-    sendSuccess(res, {
-      postId,
-      message: 'Daily draft generated. Review and approve it in the queue below.',
-    });
-  } catch (err) {
-    const error = err as Error & { code?: string };
-    if (error.code === 'AI_NOT_CONFIGURED') sendError(res, 503, error.code, error.message);
-    else if (error.code === 'NO_LINKEDIN_ACCOUNT') sendError(res, 422, error.code, error.message);
-    else throw err;
-  }
+const generateDailySchema = z.object({
+  topic: z.string().trim().min(1, 'Enter what the post should be about').max(500),
+  platforms: z.array(z.enum(['LINKEDIN', 'INSTAGRAM'])).min(1).max(2).default(['LINKEDIN']),
+  withImage: z.boolean().optional().default(true),
+  scheduledTimes: z.array(z.string().datetime()).min(1).max(7).optional(),
 });
+
+export const generateDaily = [
+  validateBody(generateDailySchema),
+  asyncHandler(async (req: Request, res: Response) => {
+    try {
+      const postIds = await generateDailyDraft(req.user!.userId, {
+        force: true,
+        topic: req.body.topic,
+        platforms: req.body.platforms,
+        withImage: req.body.withImage,
+        scheduledTimes: req.body.scheduledTimes,
+      });
+      sendSuccess(res, {
+        postIds,
+        postId: postIds[0] ?? null,
+        count: postIds.length,
+        message: postIds.length > 1
+          ? `${postIds.length} drafts generated for your date range. Review, approve, then schedule each one.`
+          : 'Draft generated. Review and approve it in the queue below.',
+      });
+    } catch (err) {
+      const error = err as Error & { code?: string };
+      if (error.code === 'AI_NOT_CONFIGURED') sendError(res, 503, error.code, error.message);
+      else if (error.code === 'TOPIC_REQUIRED') sendError(res, 422, error.code, error.message);
+      else throw err;
+    }
+  }),
+];

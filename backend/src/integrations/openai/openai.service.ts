@@ -17,21 +17,9 @@ export const generatedContentSchema = z.object({
 
 export type GeneratedContent = z.infer<typeof generatedContentSchema>;
 
-export type GenerationOperation =
-  | 'generate'
-  | 'regenerate'
-  | 'improve'
-  | 'shorten'
-  | 'lengthen'
-  | 'improve_hook'
-  | 'generate_hashtags'
-  | 'improve_cta';
-
 export interface GenerationRequest {
   topic: string;
   platform: 'LINKEDIN' | 'INSTAGRAM';
-  existingContent?: string;
-  operation?: GenerationOperation;
 }
 
 const PLATFORM_CONSTRAINTS = {
@@ -47,17 +35,6 @@ const PLATFORM_CONSTRAINTS = {
     style:
       'Conversational and clear. Exactly two short lines. Use at most one emoji.',
   },
-};
-
-const OPERATION_INSTRUCTIONS: Record<GenerationOperation, (request: GenerationRequest) => string> = {
-  generate: () => 'Write a new two-line social media post',
-  regenerate: () => 'Write a fresh two-line alternative of the post',
-  improve: () => 'Tighten the two-line caption so it is punchy and clear',
-  shorten: () => 'Keep exactly two short lines and make each line even tighter',
-  lengthen: () => 'Keep exactly two lines, but make each line a bit richer and more useful',
-  improve_hook: () => 'Rewrite line 1 so it is a stronger hook. Keep the whole caption at two lines.',
-  generate_hashtags: () => 'Keep the two-line caption and generate fresh, relevant hashtags',
-  improve_cta: () => 'Keep the two-line caption and strengthen the separate call-to-action field',
 };
 
 const FALLBACK_MODEL = 'gpt-4o-mini';
@@ -115,7 +92,7 @@ export class OpenAIService {
         const content = this.parseResponse(rawText);
 
         const durationMs = Date.now() - startMs;
-        logger.info('Content generated', { model, durationMs, platform: request.platform, operation: request.operation });
+        logger.info('Content generated', { model, durationMs, platform: request.platform });
         return { content, durationMs, model };
       } catch (err) {
         lastError = err as Error;
@@ -299,23 +276,17 @@ export class OpenAIService {
 
   private buildPrompt(request: GenerationRequest): string {
     const platform = PLATFORM_CONSTRAINTS[request.platform];
-    const operation = request.operation ?? 'generate';
-
-    const optionalLines = [
-      request.topic && `TOPIC/IDEA: ${request.topic}`,
-      request.existingContent && `EXISTING CONTENT TO WORK FROM:\n${request.existingContent}`,
-    ].filter(Boolean);
 
     return `You are an expert social media strategist and copywriter.
 
-TASK: ${OPERATION_INSTRUCTIONS[operation](request)}
+TASK: Write a new two-line social media post
 
 PLATFORM: ${request.platform}
 Platform style: ${platform.style}
 Maximum characters: ${platform.maxChars}
 Hashtag limit: ${platform.hashtagLimit}
 
-${optionalLines.join('\n')}
+TOPIC/IDEA: ${request.topic}
 
 RULES:
 1. Write about the exact topic provided; do not invent statistics or claims.

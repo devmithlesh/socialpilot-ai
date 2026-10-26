@@ -91,7 +91,7 @@ export const postChangePassword = [
 ];
 
 export const me = asyncHandler(async (req: Request, res: Response) => {
-  const { prisma } = await import('../config/database');
+  const { prisma } = await import('../config/database.js');
   const user = await prisma.user.findUnique({
     where: { id: req.user!.userId },
     select: {

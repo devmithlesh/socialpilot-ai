@@ -2,7 +2,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, PenSquare, CheckCircle2, Send,
-  Settings, Link2, User, ChevronLeft, ChevronRight,
+  Link2, User, ChevronLeft, ChevronRight,
   LogOut, Sun, Moon, Zap,
 } from 'lucide-react';
 import { clsx } from 'clsx';
@@ -20,7 +20,6 @@ const NAV_ITEMS = [
 ];
 
 const BOTTOM_ITEMS = [
-  { path: '/brand', label: 'Brand Settings', icon: Settings },
   { path: '/accounts', label: 'Connected Accounts', icon: Link2 },
   { path: '/profile', label: 'Profile & Settings', icon: User },
 ];

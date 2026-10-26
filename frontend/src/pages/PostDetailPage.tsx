@@ -1,10 +1,9 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   CheckCircle2, Edit3, Send, AlertTriangle, ArrowLeft,
-  Clock, Hash, Megaphone, Shield, Info,
-  Image as ImageIcon, UploadCloud, Check, Sparkles,
+  Clock, Hash, Megaphone, Shield, Info, Maximize2,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { clsx } from 'clsx';
@@ -13,51 +12,32 @@ import {
   useApprovePostMutation,
   usePublishPostMutation,
   useSchedulePostMutation,
-  useUpdatePostMutation,
-  useGenerateImageMutation,
   useGetAccountsQuery,
 } from '../api/apiSlice';
 import { Button, Modal, PlatformIcon, StatusBadge, Spinner } from '../components/ui';
+import { ImageLightbox } from '../components/ImageLightbox';
 import toast from 'react-hot-toast';
 
 export function PostDetailPage() {
   const { postId } = useParams<{ postId: string }>();
   const navigate = useNavigate();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [showPublishConfirm, setShowPublishConfirm] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [showImagePreview, setShowImagePreview] = useState(false);
   const [scheduleDateTime, setScheduleDateTime] = useState('');
   const [selectedAccountId, setSelectedAccountId] = useState('');
   const [now] = useState(() => Date.now());
-  // Edit Modal State
-  const [isEditing, setIsEditing] = useState(false);
-  const [editCaption, setEditCaption] = useState('');
-  const [editHashtags, setEditHashtags] = useState('');
-  const [editCta, setEditCta] = useState('');
-  const [editImageUrl, setEditImageUrl] = useState('');
 
   const { data, isLoading, refetch } = useGetPostQuery(postId!, { skip: !postId });
   const { data: accountsData } = useGetAccountsQuery();
   const [approve, { isLoading: isApproving }] = useApprovePostMutation();
   const [publish, { isLoading: isPublishing }] = usePublishPostMutation();
   const [schedulePost, { isLoading: isScheduling }] = useSchedulePostMutation();
-  const [updatePost, { isLoading: isUpdating }] = useUpdatePostMutation();
-  const [generateImage, { isLoading: isGeneratingImage }] = useGenerateImageMutation();
 
   const post = data?.data;
   const latestVersion = post?.versions?.[0];
   const accounts = accountsData?.data?.filter((a) => a.platform === post?.platform) ?? [];
-
-  // Sync edit form with latest version
-  useEffect(() => {
-    if (latestVersion) {
-      setEditCaption(latestVersion.caption);
-      setEditHashtags(latestVersion.hashtags?.join(', ') || '');
-      setEditCta(latestVersion.callToAction || '');
-      setEditImageUrl(latestVersion.imageUrl || '');
-    }
-  }, [latestVersion]);
 
   const displayImageUrl = latestVersion?.imageUrl;
 
@@ -119,62 +99,6 @@ export function PostDetailPage() {
     }
   };
 
-  const handleSavePostEdits = async () => {
-    if (!postId) return;
-    try {
-      const hashtagsArray = editHashtags
-        .split(',')
-        .map((h) => h.trim().replace(/^#/, ''))
-        .filter(Boolean);
-
-      await updatePost({
-        id: postId,
-        content: {
-          caption: editCaption,
-          hashtags: hashtagsArray,
-          callToAction: editCta || undefined,
-          imageUrl: editImageUrl || undefined,
-        },
-      }).unwrap();
-
-      toast.success('Post updated with a new version!');
-      setIsEditing(false);
-      await refetch();
-    } catch (err: unknown) {
-      const error = err as { data?: { error?: { message?: string } } };
-      toast.error(error.data?.error?.message ?? 'Failed to update post');
-    }
-  };
-
-  const handleGenerateImage = async () => {
-    if (!post || !editCaption.trim()) {
-      toast.error('Write the caption first — the image is generated from it.');
-      return;
-    }
-    try {
-      const res = await generateImage({ caption: editCaption, platform: post.platform }).unwrap();
-      if (res.data) {
-        setEditImageUrl(res.data.imageUrl);
-        toast.success('Image generated. Save changes to keep it.');
-      }
-    } catch (err: unknown) {
-      const error = err as { data?: { error?: { message?: string } } };
-      toast.error(error.data?.error?.message ?? 'Image generation failed. Please try again.');
-    }
-  };
-
-  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const base64 = ev.target?.result as string;
-      setEditImageUrl(base64);
-      toast.success('New image loaded from device!');
-    };
-    reader.readAsDataURL(file);
-  };
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-96">
@@ -200,7 +124,7 @@ export function PostDetailPage() {
   const canPublish = post.status === 'APPROVED' && !post.approval?.isConsumed && !isApprovalExpired;
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <div className=" mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
         <button
@@ -226,7 +150,7 @@ export function PostDetailPage() {
             variant="ghost"
             size="sm"
             leftIcon={<Edit3 size={14} />}
-            onClick={() => setIsEditing(true)}
+            onClick={() => navigate(`/create?postId=${post.id}`)}
           >
             Edit Post
           </Button>
@@ -260,13 +184,21 @@ export function PostDetailPage() {
 
                       {/* Visual Post Image */}
                       {displayImageUrl ? (
-                        <div className="relative rounded-xl overflow-hidden border border-[var(--color-border)] bg-[var(--color-surface-2)] mb-4 group shadow-xl">
+                        <button
+                          type="button"
+                          onClick={() => setShowImagePreview(true)}
+                          className="relative block w-full rounded-xl overflow-hidden border border-[var(--color-border)] bg-[var(--color-surface-2)] mb-4 shadow-xl text-left"
+                          title="View full screen"
+                        >
                           <img
                             src={displayImageUrl}
                             alt={latestVersion.imageAltText ?? 'Post image'}
                             className="w-full max-h-[580px] object-contain rounded-xl bg-[var(--color-surface-2)]"
                           />
-                        </div>
+                          <span className="absolute top-3 right-3 h-8 w-8 rounded-full bg-black/60 text-white flex items-center justify-center">
+                            <Maximize2 size={14} />
+                          </span>
+                        </button>
                       ) : null}
 
                       {/* Caption text */}
@@ -526,128 +458,6 @@ export function PostDetailPage() {
         </div>
       </div>
 
-      {/* ─── LIVE POST EDITOR MODAL ─── */}
-      <Modal
-        open={isEditing}
-        onClose={() => setIsEditing(false)}
-        title="Edit Post Content & Visual"
-        maxWidth="lg"
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="label">Caption</label>
-            <textarea
-              className="input w-full resize-none font-sans text-sm"
-              rows={7}
-              value={editCaption}
-              onChange={(e) => setEditCaption(e.target.value)}
-              placeholder="Write or edit your post caption..."
-            />
-          </div>
-
-          <div>
-            <label className="label">Hashtags (comma-separated)</label>
-            <input
-              type="text"
-              className="input w-full text-xs"
-              value={editHashtags}
-              onChange={(e) => setEditHashtags(e.target.value)}
-              placeholder="frontend, webdev, javascript, react"
-            />
-          </div>
-
-          <div>
-            <label className="label">Call to Action (CTA)</label>
-            <input
-              type="text"
-              className="input w-full text-xs"
-              value={editCta}
-              onChange={(e) => setEditCta(e.target.value)}
-              placeholder="Engaging closing question or bookmark CTA"
-            />
-          </div>
-
-          {/* Image & Visual options */}
-          <div className="p-3.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-2)] space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-[var(--color-text)] flex items-center gap-1.5">
-                <ImageIcon size={14} className="text-brand-400" />
-                Post Image / Visual
-              </span>
-            </div>
-
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleImageFileChange}
-            />
-
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant="primary"
-                size="sm"
-                className="flex-1 text-xs"
-                loading={isGeneratingImage}
-                onClick={handleGenerateImage}
-                leftIcon={<Sparkles size={14} />}
-              >
-                {editImageUrl ? 'Regenerate with AI' : 'Generate image with AI'}
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                className="flex-1 text-xs"
-                onClick={() => fileInputRef.current?.click()}
-                leftIcon={<UploadCloud size={14} />}
-              >
-                Upload from device
-              </Button>
-              {editImageUrl && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-xs text-danger"
-                  onClick={() => setEditImageUrl('')}
-                >
-                  Remove Image
-                </Button>
-              )}
-            </div>
-
-            {editImageUrl && (
-              <div className="relative rounded-lg overflow-hidden border border-[var(--color-border)] max-h-40 bg-[var(--color-surface-2)]">
-                <img
-                  src={editImageUrl}
-                  alt="Edit preview"
-                  className="w-full max-h-40 object-contain"
-                />
-              </div>
-            )}
-          </div>
-
-          <div className="flex gap-3 pt-2">
-            <Button
-              variant="secondary"
-              className="flex-1"
-              onClick={() => setIsEditing(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              className="flex-1"
-              loading={isUpdating}
-              onClick={handleSavePostEdits}
-              leftIcon={<Check size={16} />}
-            >
-              Save New Version
-            </Button>
-          </div>
-        </div>
-      </Modal>
-
       {/* Final publish confirmation modal */}
       <Modal
         open={showPublishConfirm}
@@ -754,6 +564,13 @@ export function PostDetailPage() {
           </div>
         </form>
       </Modal>
+
+      <ImageLightbox
+        src={displayImageUrl ?? ''}
+        alt={latestVersion?.imageAltText ?? 'Post image'}
+        open={showImagePreview}
+        onClose={() => setShowImagePreview(false)}
+      />
     </div>
   );
 }

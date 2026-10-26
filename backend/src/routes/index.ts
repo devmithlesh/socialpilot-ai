@@ -1,7 +1,5 @@
 import { Router } from 'express';
-import { z } from 'zod';
 import { authenticate } from '../middleware/auth';
-import { validateBody } from '../utils/api';
 import * as authController from '../controllers/auth.controller';
 import * as postsController from '../controllers/posts.controller';
 
@@ -34,8 +32,8 @@ router.post('/generate-image', authenticate, ...postsController.generateImage);
 
 // ─── Connected Accounts ───────────────────────────────────────────────────────
 router.get('/accounts', authenticate, async (req, res) => {
-  const { asyncHandler, sendSuccess } = await import('../utils/api');
-  const { prisma } = await import('../config/database');
+  const { asyncHandler, sendSuccess } = await import('../utils/api.js');
+  const { prisma } = await import('../config/database.js');
 
   return asyncHandler(async () => {
     const accounts = await prisma.connectedAccount.findMany({
@@ -59,8 +57,8 @@ router.get('/accounts', authenticate, async (req, res) => {
 
 // LinkedIn OAuth
 router.get('/auth/linkedin', authenticate, async (req, res) => {
-  const { linkedInService } = await import('../integrations/linkedin/linkedin.service');
-  const { sendSuccess, sendError } = await import('../utils/api');
+  const { linkedInService } = await import('../integrations/linkedin/linkedin.service.js');
+  const { sendSuccess, sendError } = await import('../utils/api.js');
   const crypto = await import('crypto');
 
   if (!linkedInService.isConfigured) {
@@ -75,9 +73,9 @@ router.get('/auth/linkedin', authenticate, async (req, res) => {
 });
 
 router.post('/auth/linkedin/callback', authenticate, async (req, res) => {
-  const { linkedInService } = await import('../integrations/linkedin/linkedin.service');
-  const { sendSuccess, sendError } = await import('../utils/api');
-  const { prisma } = await import('../config/database');
+  const { linkedInService } = await import('../integrations/linkedin/linkedin.service.js');
+  const { sendSuccess, sendError } = await import('../utils/api.js');
+  const { prisma } = await import('../config/database.js');
 
   const { code } = req.body;
   if (!code) { sendError(res, 400, 'MISSING_CODE', 'Authorization code is required'); return; }
@@ -121,8 +119,8 @@ router.post('/auth/linkedin/callback', authenticate, async (req, res) => {
 
 // Instagram OAuth
 router.get('/auth/instagram', authenticate, async (req, res) => {
-  const { instagramService } = await import('../integrations/instagram/instagram.service');
-  const { sendSuccess, sendError } = await import('../utils/api');
+  const { instagramService } = await import('../integrations/instagram/instagram.service.js');
+  const { sendSuccess, sendError } = await import('../utils/api.js');
   const crypto = await import('crypto');
 
   if (!instagramService.isConfigured) {
@@ -136,9 +134,9 @@ router.get('/auth/instagram', authenticate, async (req, res) => {
 });
 
 router.post('/auth/instagram/callback', authenticate, async (req, res) => {
-  const { instagramService } = await import('../integrations/instagram/instagram.service');
-  const { sendSuccess, sendError } = await import('../utils/api');
-  const { prisma } = await import('../config/database');
+  const { instagramService } = await import('../integrations/instagram/instagram.service.js');
+  const { sendSuccess, sendError } = await import('../utils/api.js');
+  const { prisma } = await import('../config/database.js');
 
   const { code } = req.body;
   if (!code) { sendError(res, 400, 'MISSING_CODE', 'Authorization code is required'); return; }
@@ -181,8 +179,8 @@ router.post('/auth/instagram/callback', authenticate, async (req, res) => {
 
 // Disconnect account
 router.delete('/accounts/:accountId', authenticate, async (req, res) => {
-  const { asyncHandler, sendSuccess, sendError } = await import('../utils/api');
-  const { prisma } = await import('../config/database');
+  const { asyncHandler, sendSuccess, sendError } = await import('../utils/api.js');
+  const { prisma } = await import('../config/database.js');
 
   return asyncHandler(async () => {
     const account = await prisma.connectedAccount.findFirst({
@@ -203,52 +201,10 @@ router.delete('/accounts/:accountId', authenticate, async (req, res) => {
   })(req, res, () => {});
 });
 
-// Brand Settings
-router.get('/brand-settings', authenticate, async (req, res) => {
-  const { asyncHandler, sendSuccess } = await import('../utils/api');
-  const { prisma } = await import('../config/database');
-
-  return asyncHandler(async () => {
-    const settings = await prisma.brandSettings.findUnique({
-      where: { userId: req.user!.userId },
-    });
-    sendSuccess(res, settings);
-  })(req, res, () => {});
-});
-
-// Explicit allow-list: unknown keys (e.g. userId) are stripped, never mass-assigned.
-const brandSettingsSchema = z.object({
-  brandName: z.string().max(200).nullish(),
-  brandVoice: z.string().max(4000).nullish(),
-  targetAudience: z.string().max(4000).nullish(),
-  tonePreferences: z.array(z.string().max(100)).max(20).optional(),
-  keywords: z.array(z.string().max(100)).max(30).optional(),
-  preferredHashtags: z.array(z.string().max(100)).max(30).optional(),
-  guidelines: z.string().max(8000).nullish(),
-  logoUrl: z.string().max(2000).nullish(),
-  primaryColor: z.string().max(20).nullish(),
-  secondaryColor: z.string().max(20).nullish(),
-  dailyPostEnabled: z.boolean().optional(),
-});
-
-router.put('/brand-settings', authenticate, validateBody(brandSettingsSchema), async (req, res) => {
-  const { asyncHandler, sendSuccess } = await import('../utils/api');
-  const { prisma } = await import('../config/database');
-
-  return asyncHandler(async () => {
-    const settings = await prisma.brandSettings.upsert({
-      where: { userId: req.user!.userId },
-      update: req.body,
-      create: { ...req.body, userId: req.user!.userId },
-    });
-    sendSuccess(res, settings);
-  })(req, res, () => {});
-});
-
 // Notifications
 router.get('/notifications', authenticate, async (req, res) => {
-  const { asyncHandler, sendSuccess } = await import('../utils/api');
-  const { prisma } = await import('../config/database');
+  const { asyncHandler, sendSuccess } = await import('../utils/api.js');
+  const { prisma } = await import('../config/database.js');
 
   return asyncHandler(async () => {
     const notifications = await prisma.notification.findMany({
@@ -261,8 +217,8 @@ router.get('/notifications', authenticate, async (req, res) => {
 });
 
 router.patch('/notifications/:id/read', authenticate, async (req, res) => {
-  const { asyncHandler, sendSuccess } = await import('../utils/api');
-  const { prisma } = await import('../config/database');
+  const { asyncHandler, sendSuccess } = await import('../utils/api.js');
+  const { prisma } = await import('../config/database.js');
 
   return asyncHandler(async () => {
     await prisma.notification.updateMany({

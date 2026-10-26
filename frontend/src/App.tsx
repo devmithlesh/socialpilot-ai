@@ -19,7 +19,6 @@ const PostDetailPage = lazy(() => import('./pages/PostDetailPage').then((m) => (
 const ApprovalQueuePage = lazy(() => import('./pages/ApprovalQueuePage').then((m) => ({ default: m.ApprovalQueuePage })));
 const PublishedPostsPage = lazy(() => import('./pages/PublishedPostsPage').then((m) => ({ default: m.PublishedPostsPage })));
 const ConnectedAccountsPage = lazy(() => import('./pages/ConnectedAccountsPage').then((m) => ({ default: m.ConnectedAccountsPage })));
-const BrandSettingsPage = lazy(() => import('./pages/BrandSettingsPage').then((m) => ({ default: m.BrandSettingsPage })));
 const ProfilePage = lazy(() => import('./pages/ProfilePage').then((m) => ({ default: m.ProfilePage })));
 const OAuthCallbackPage = lazy(() => import('./pages/OAuthCallbackPage').then((m) => ({ default: m.OAuthCallbackPage })));
 
@@ -151,14 +150,7 @@ const router = createBrowserRouter([
           </Suspense>
         ),
       },
-      {
-        path: 'brand',
-        element: (
-          <Suspense fallback={<PageLoader />}>
-            <BrandSettingsPage />
-          </Suspense>
-        ),
-      },
+      { path: 'brand', element: <Navigate to="/create" replace /> },
       {
         path: 'profile',
         element: (
