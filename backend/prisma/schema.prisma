@@ -176,9 +176,9 @@ model PostVersion {
 model GenerationHistory {
   id       String @id @default(cuid())
   postId   String
-  model    String // e.g. "gemini-1.5-flash"
-  prompt   Json   // The structured prompt sent to Gemini
-  response Json   // The structured response from Gemini
+  model    String // e.g. "gpt-4o-mini"
+  prompt   Json   // The structured prompt sent to ChatGPT
+  response Json   // The structured response from ChatGPT
   tokensUsed Int?
   durationMs Int?
   wasSuccessful Boolean @default(true)

@@ -1,11 +1,11 @@
-import { generatedContentSchema, GeminiService } from './gemini.service';
+import { generatedContentSchema, limitCaptionToTwoLines, OpenAIService } from './openai.service';
 
-// Isolate from the developer's real .env so tests never call Gemini.
+// Isolate from the developer's real .env so tests never call OpenAI.
 jest.mock('../../config/env', () => ({
-  config: { NODE_ENV: 'test', GEMINI_API_KEY: undefined, GEMINI_MODEL: 'test-model' },
+  config: { NODE_ENV: 'test', OPENAI_API_KEY: undefined, OPENAI_MODEL: 'test-model', OPENAI_IMAGE_MODEL: 'test-image' },
 }));
 
-describe('Gemini Service & Schemas', () => {
+describe('OpenAI Service & Schemas', () => {
   describe('generatedContentSchema', () => {
     it('should validate complete valid generated content', () => {
       const validContent = {
@@ -53,20 +53,32 @@ describe('Gemini Service & Schemas', () => {
     });
   });
 
-  describe('GeminiService availability', () => {
+  describe('limitCaptionToTwoLines', () => {
+    it('keeps only the first two lines', () => {
+      expect(limitCaptionToTwoLines('Line one\nLine two\nLine three')).toBe('Line one\nLine two');
+    });
+
+    it('splits a multi-sentence paragraph into two lines', () => {
+      expect(limitCaptionToTwoLines('Learn HTML first. Then practice by building a simple page.')).toBe(
+        'Learn HTML first.\nThen practice by building a simple page.'
+      );
+    });
+  });
+
+  describe('OpenAIService availability', () => {
     it('should report availability correctly when API key is not set', () => {
-      const service = new GeminiService();
-            expect(service.isAvailable).toBe(false);
+      const service = new OpenAIService();
+      expect(service.isAvailable).toBe(false);
     });
 
     it('should throw descriptive AI_NOT_CONFIGURED error when generating without API key', async () => {
-      const service = new GeminiService();
+      const service = new OpenAIService();
       await expect(
         service.generateContent({
           topic: 'Future of Web Development',
           platform: 'LINKEDIN',
         })
-      ).rejects.toThrow('AI generation is not available. GEMINI_API_KEY is not configured.');
+      ).rejects.toThrow('AI generation is not available. OPENAI_API_KEY is not configured.');
     });
   });
 });

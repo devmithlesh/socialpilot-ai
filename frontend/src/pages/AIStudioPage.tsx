@@ -92,7 +92,7 @@ export function AIStudioPage() {
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: { platform: 'LINKEDIN', contentLength: 'medium' },
+    defaultValues: { platform: 'LINKEDIN', contentLength: 'short' },
   });
 
   const platform = watch('platform') as SocialPlatform;
@@ -116,7 +116,7 @@ export function AIStudioPage() {
         name: file.name,
         size: file.size,
       });
-      toast.success(`Image "${file.name}" uploaded! Gemini will analyze it.`);
+      toast.success(`Image "${file.name}" uploaded! ChatGPT will analyze it.`);
     };
     reader.readAsDataURL(file);
   };
@@ -205,7 +205,7 @@ export function AIStudioPage() {
       <div className="mb-6">
         <h1 className="page-title">AI Content Studio</h1>
         <p className="page-subtitle">
-          Generate platform-optimized social media content powered by Gemini AI.
+          Generate platform-optimized social media content powered by ChatGPT.
         </p>
       </div>
 
@@ -287,7 +287,7 @@ export function AIStudioPage() {
                       Select or drop image from gallery
                     </p>
                     <p className="text-[11px] text-[var(--color-text-muted)]">
-                      Gemini Vision will analyze it and write a matching description
+                      ChatGPT will analyze it and write a matching description
                     </p>
                   </div>
                 </div>
@@ -301,7 +301,7 @@ export function AIStudioPage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 text-xs font-semibold text-brand-400">
                       <Sparkles size={13} />
-                      <span>Gemini Vision Ready</span>
+                      <span>ChatGPT ready</span>
                     </div>
                     <p className="text-xs font-medium text-[var(--color-text)] truncate mt-0.5">
                       {uploadedImage.name}
@@ -328,7 +328,7 @@ export function AIStudioPage() {
             <div>
               <Textarea
                 label={uploadedImage ? "Topic or key angle (Optional)" : "Topic or search prompt *"}
-                placeholder={uploadedImage ? "e.g. 'Focus on step 3' or leave blank for full auto analysis" : "Ask or search anything like Gemini: e.g. 'Frontend Developer Roadmap', 'B2B SaaS Growth Playbook', 'Fitness in 90 Days', 'Crypto Investing for Beginners'..."}
+                placeholder={uploadedImage ? "e.g. 'Focus on step 3' or leave blank for full auto analysis" : "Ask or search anything: e.g. 'Frontend Developer Roadmap', 'B2B SaaS Growth Playbook', 'Fitness in 90 Days', 'Crypto Investing for Beginners'..."}
                 rows={3}
                 error={errors.topic?.message}
                 {...register('topic')}
@@ -402,12 +402,8 @@ export function AIStudioPage() {
                 >
                   <div className="grid grid-cols-2 gap-3">
                     <Select
-                      label="Content length"
-                      options={[
-                        { value: 'short', label: 'Short' },
-                        { value: 'medium', label: 'Medium' },
-                        { value: 'long', label: 'Long' },
-                      ]}
+                      label="Caption length"
+                      options={[{ value: 'short', label: '2 lines' }]}
                       {...register('contentLength')}
                     />
                     <Select
@@ -509,7 +505,7 @@ export function AIStudioPage() {
                       <Sparkles size={20} className="text-brand-400 animate-pulse-slow" />
                     </div>
                   </div>
-                  <p className="text-sm text-[var(--color-text-muted)]">Gemini is crafting your content...</p>
+                  <p className="text-sm text-[var(--color-text-muted)]">ChatGPT is crafting your content...</p>
                   <div className="flex gap-1">
                     {[0, 1, 2].map((i) => (
                       <motion.div

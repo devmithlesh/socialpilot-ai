@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { sendSuccess, sendError, asyncHandler, validateBody, validateQuery } from '../utils/api';
 import { prisma } from '../config/database';
-import { geminiService, GenerationRequest } from '../integrations/gemini/gemini.service';
+import { openaiService, GenerationRequest } from '../integrations/openai/openai.service';
 import {
   createPost,
   updatePostContent,
@@ -61,15 +61,15 @@ const postsQuerySchema = z.object({
 export const generateContent = [
   validateBody(generateContentSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    if (!geminiService.isAvailable) {
-      sendError(res, 503, 'AI_NOT_CONFIGURED', 'AI generation is not available. Configure GEMINI_API_KEY to enable this feature.');
+    if (!openaiService.isAvailable) {
+      sendError(res, 503, 'AI_NOT_CONFIGURED', 'AI generation is not available. Configure OPENAI_API_KEY to enable this feature.');
       return;
     }
 
     const userId = req.user!.userId;
     const { postId, connectedAccountId, withImage, existingImageUrl, ...generationParams } = req.body;
 
-    const { content, durationMs } = await geminiService.generateContent(
+    const { content, durationMs, model } = await openaiService.generateContent(
       generationParams as GenerationRequest
     );
 
@@ -81,7 +81,7 @@ export const generateContent = [
     let imageWarning: string | undefined;
     if (withImage && !content.imageUrl) {
       try {
-        const image = await geminiService.generateImage({
+        const image = await openaiService.generateImage({
           caption: content.caption,
           topic: generationParams.topic,
           platform: generationParams.platform,
@@ -135,7 +135,7 @@ export const generateContent = [
       await prisma.generationHistory.create({
         data: {
           postId: savedPostId,
-          model: 'gemini',
+          model,
           prompt: generationParams,
           response: { ...content, imageUrl: content.imageUrl ? '[image omitted]' : null } as any,
           durationMs,
@@ -163,12 +163,12 @@ const generateImageSchema = z.object({
 export const generateImage = [
   validateBody(generateImageSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    if (!geminiService.isAvailable) {
-      sendError(res, 503, 'AI_NOT_CONFIGURED', 'AI generation is not available. Configure GEMINI_API_KEY to enable this feature.');
+    if (!openaiService.isAvailable) {
+      sendError(res, 503, 'AI_NOT_CONFIGURED', 'AI generation is not available. Configure OPENAI_API_KEY to enable this feature.');
       return;
     }
     try {
-      const image = await geminiService.generateImage(req.body);
+      const image = await openaiService.generateImage(req.body);
       sendSuccess(res, { imageUrl: image.dataUrl, imageAltText: image.altText, durationMs: image.durationMs });
     } catch (err) {
       const error = err as Error & { code?: string };

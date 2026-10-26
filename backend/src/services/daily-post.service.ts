@@ -1,6 +1,6 @@
 import { prisma } from '../config/database';
 import { logger } from '../config/logger';
-import { geminiService } from '../integrations/gemini/gemini.service';
+import { openaiService } from '../integrations/openai/openai.service';
 import { createPost } from './post.service';
 
 const RECENT_POSTS_TO_AVOID = 10;
@@ -25,8 +25,8 @@ export async function generateDailyDraft(
   userId: string,
   { force }: { force: boolean }
 ): Promise<string | null> {
-  if (!geminiService.isAvailable) {
-    throw Object.assign(new Error('AI generation is not configured (GEMINI_API_KEY).'), {
+  if (!openaiService.isAvailable) {
+    throw Object.assign(new Error('AI generation is not configured (OPENAI_API_KEY).'), {
       code: 'AI_NOT_CONFIGURED',
     });
   }
@@ -64,7 +64,7 @@ export async function generateDailyDraft(
     : brand?.brandName || brand?.targetAudience || 'practical professional growth';
   const recentOpeners = recentVersions.map((v) => `- ${v.caption.slice(0, 80).replace(/\s+/g, ' ')}`);
 
-  const { content, durationMs } = await geminiService.generateContent({
+  const { content, durationMs, model } = await openaiService.generateContent({
     platform: 'LINKEDIN',
     operation: 'generate',
     topic: `Choose ONE fresh, specific, useful topic related to: ${focus}`,
@@ -76,6 +76,7 @@ export async function generateDailyDraft(
     brandGuidelines: brand?.guidelines ?? undefined,
     tone: brand?.tonePreferences[0],
     keywords: brand?.keywords,
+    contentLength: 'short',
   });
 
   const post = await createPost(
@@ -94,7 +95,7 @@ export async function generateDailyDraft(
     prisma.generationHistory.create({
       data: {
         postId: post.id,
-        model: 'gemini',
+        model,
         prompt: { source: 'daily', focus },
         response: content,
         durationMs,

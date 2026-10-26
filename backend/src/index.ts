@@ -36,7 +36,7 @@ async function main() {
     logger.info(`SocialPilot AI backend running`, {
       port: config.PORT,
       environment: config.NODE_ENV,
-      aiAvailable: !!config.GEMINI_API_KEY,
+      aiAvailable: !!config.OPENAI_API_KEY,
       linkedInConfigured: !!(config.LINKEDIN_CLIENT_ID && config.LINKEDIN_CLIENT_SECRET),
       instagramConfigured: !!(config.INSTAGRAM_APP_ID && config.INSTAGRAM_APP_SECRET),
     });

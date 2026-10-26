@@ -18,10 +18,10 @@ const envSchema = z.object({
   // Frontend
   FRONTEND_URL: z.string().url().default('http://localhost:5173'),
 
-  // Google Gemini
-  GEMINI_API_KEY: z.string().optional(),
-  GEMINI_MODEL: z.string().default('gemini-3.8-flash'),
-  GEMINI_IMAGE_MODEL: z.string().default('gemini-2.5-flash-image'),
+  // OpenAI ChatGPT
+  OPENAI_API_KEY: z.string().optional(),
+  OPENAI_MODEL: z.string().default('gpt-4o-mini'),
+  OPENAI_IMAGE_MODEL: z.string().default('gpt-image-2'),
 
   // LinkedIn OAuth
   LINKEDIN_CLIENT_ID: z.string().optional(),
